@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import auth, chat, documents
+from app.api import auth
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version=settings.VERSION,
     description="AI chatbot for cybersecurity compliance and insider risk evaluation",
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -14,27 +14,25 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(auth.router, prefix=settings.API_V1_STR, tags=["authentication"])
-app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
-app.include_router(documents.router, prefix=settings.API_V1_STR, tags=["documents"])
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 
 
 @app.get("/")
 async def root():
     return {
         "message": "Welcome to Sahakari Bot API",
-        "version": settings.VERSION,
-        "docs": "/docs"
+        "docs": "/docs",
+        "health": "/health"
     }
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "Sahakari Bot"}

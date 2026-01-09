@@ -1,58 +1,57 @@
-from fastapi import APIRouter, HTTPException, status, Depends
-from datetime import timedelta, datetime
+from fastapi import APIRouter, HTTPException, status
+from datetime import datetime, timedelta
 from app.core.config import settings
-from app.core.security import (
-    verify_password,
-    get_password_hash,
-    create_access_token
-)
-from app.models.user import UserCreate, UserLogin, Token, UserResponse
-from app.core.database import get_collection
+from app.core.security import hash_password, verify_password, create_access_token
+from app.models.schemas import UserRegister, UserLogin, Token, UserResponse
 import json
 import os
 
 router = APIRouter()
 
-# Simple in-memory user store (for demo - replace with database in production)
-USERS_FILE = "./users.json"
+USERS_FILE = "users.json"
 
 
-def load_users():
-    """Load users from file."""
+def load_users() -> dict:
+    """Load users from JSON file."""
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r") as f:
             return json.load(f)
     return {}
 
 
-def save_users(users):
-    """Save users to file."""
+def save_users(users: dict):
+    """Save users to JSON file."""
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2, default=str)
 
 
-@router.post("/auth/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+async def register(user_data: UserRegister):
     """Register a new user."""
     users = load_users()
     
     # Check if user already exists
-    for user_id, user in users.items():
-        if user["email"] == user_data.email or user["username"] == user_data.username:
+    for uid, user in users.items():
+        if user["email"] == user_data.email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email or username already registered"
+                detail="Email already registered"
+            )
+        if user["username"] == user_data.username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
             )
     
     # Create new user
     new_user_id = len(users) + 1
-    hashed_password = get_password_hash(user_data.password)
+    hashed_password = hash_password(user_data.password)
     
     new_user = {
         "id": new_user_id,
         "email": user_data.email,
         "username": user_data.username,
-        "hashed_password": hashed_password,
+        "password_hash": hashed_password,
         "created_at": str(datetime.utcnow())
     }
     
@@ -60,15 +59,16 @@ async def register(user_data: UserCreate):
     save_users(users)
     
     # Create access token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": new_user_id, "email": user_data.email, "username": user_data.username},
-        expires_delta=access_token_expires
+        data={
+            "sub": str(new_user_id),
+            "email": user_data.email,
+            "username": user_data.username
+        }
     )
     
     return Token(
         access_token=access_token,
-        token_type="bearer",
         user=UserResponse(
             id=new_user_id,
             email=user_data.email,
@@ -78,14 +78,14 @@ async def register(user_data: UserCreate):
     )
 
 
-@router.post("/auth/login", response_model=Token)
+@router.post("/login", response_model=Token)
 async def login(credentials: UserLogin):
     """Login and get access token."""
     users = load_users()
     
     # Find user by email
     user = None
-    for user_id, u in users.items():
+    for uid, u in users.items():
         if u["email"] == credentials.email:
             user = u
             break
@@ -97,22 +97,23 @@ async def login(credentials: UserLogin):
         )
     
     # Verify password
-    if not verify_password(credentials.password, user["hashed_password"]):
+    if not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
     
     # Create access token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["id"], "email": user["email"], "username": user["username"]},
-        expires_delta=access_token_expires
+        data={
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "username": user["username"]
+        }
     )
     
     return Token(
         access_token=access_token,
-        token_type="bearer",
         user=UserResponse(
             id=user["id"],
             email=user["email"],
