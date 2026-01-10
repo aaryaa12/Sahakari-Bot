@@ -1,18 +1,46 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { chatAPI } from '../services/api';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { chatAPI, documentsAPI } from "../services/api";
+import DocumentUpload from "../components/DocumentUpload";
 
 const Chat = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  const loadDocuments = async () => {
+    try {
+      const response = await documentsAPI.list();
+      setDocuments(response.data.documents || []);
+    } catch (error) {
+      console.error("Error loading documents:", error);
+    }
+  };
+
+  const handleUploadSuccess = (data) => {
+    const successMsg = {
+      id: Date.now(),
+      type: "system",
+      content: `✅ Document "${data.filename}" uploaded! ${data.chunks_processed} chunks processed.`,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, successMsg]);
+    loadDocuments();
+    setShowUpload(false);
+  };
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleSend = async (e) => {
@@ -21,20 +49,20 @@ const Chat = () => {
 
     const userMessage = {
       id: Date.now(),
-      type: 'user',
+      type: "user",
       content: input,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    setInput("");
     setLoading(true);
 
     try {
       const response = await chatAPI.query({ query: input });
       const botMessage = {
         id: Date.now() + 1,
-        type: 'bot',
+        type: "bot",
         content: response.data.answer,
         citations: response.data.citations,
         timestamp: new Date(),
@@ -43,8 +71,8 @@ const Chat = () => {
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
-        type: 'error',
-        content: error.response?.data?.detail || 'Failed to get response. Please try again.',
+        type: "error",
+        content: error.response?.data?.detail || "Failed to get response.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -70,7 +98,16 @@ const Chat = () => {
                 <p className="text-xs text-gray-500">Compliance Assistant</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowUpload(!showUpload)}
+                className="px-4 py-2 text-sm text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span>Upload</span>
+              </button>
               <span className="text-sm text-gray-600">Welcome, {user?.username}</span>
               <button
                 onClick={handleLogout}
@@ -83,6 +120,43 @@ const Chat = () => {
         </div>
       </header>
 
+      {/* Upload Section */}
+      {showUpload && (
+        <div className="bg-gray-100 border-b border-gray-200 p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-medium text-gray-900">Upload Documents</h3>
+              <button
+                onClick={() => setShowUpload(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <DocumentUpload onUploadSuccess={handleUploadSuccess} />
+            {documents.length > 0 && (
+              <div className="mt-3 p-3 bg-white rounded-lg">
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Uploaded Documents ({documents.length}):
+                </p>
+                <div className="space-y-1">
+                  {documents.map((doc, idx) => (
+                    <div key={idx} className="text-xs text-gray-600 flex items-center space-x-2">
+                      <svg className="w-4 h-4 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                      </svg>
+                      <span>{doc.filename}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto">
         {messages.length === 0 ? (
@@ -93,13 +167,13 @@ const Chat = () => {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Sahakari Bot!</h2>
-            <p className="text-gray-600 mb-6">Ask questions about cybersecurity compliance and insider risk.</p>
+            <p className="text-gray-600 mb-6">Upload documents and ask questions about compliance.</p>
             <div className="max-w-md mx-auto text-left bg-white rounded-lg p-6 shadow-sm">
               <p className="text-sm font-medium text-gray-700 mb-3">Try asking:</p>
               <ul className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-start">
                   <span className="text-primary-600 mr-2">•</span>
-                  What are the password requirements for cooperatives?
+                  What are the password requirements?
                 </li>
                 <li className="flex items-start">
                   <span className="text-primary-600 mr-2">•</span>
@@ -117,15 +191,23 @@ const Chat = () => {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${
+                  msg.type === "user"
+                    ? "justify-end"
+                    : msg.type === "system"
+                    ? "justify-center"
+                    : "justify-start"
+                }`}
               >
                 <div
                   className={`max-w-3xl px-4 py-3 rounded-lg ${
-                    msg.type === 'user'
-                      ? 'bg-primary-600 text-white'
-                      : msg.type === 'error'
-                      ? 'bg-red-50 text-red-800 border border-red-200'
-                      : 'bg-white text-gray-800 shadow-sm border border-gray-200'
+                    msg.type === "user"
+                      ? "bg-primary-600 text-white"
+                      : msg.type === "system"
+                      ? "bg-green-50 text-green-800 border border-green-200 text-sm"
+                      : msg.type === "error"
+                      ? "bg-red-50 text-red-800 border border-red-200"
+                      : "bg-white text-gray-800 shadow-sm border border-gray-200"
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -139,9 +221,11 @@ const Chat = () => {
                       ))}
                     </div>
                   )}
-                  <p className="text-xs mt-2 opacity-70">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                  </p>
+                  {msg.type !== "system" && (
+                    <p className="text-xs mt-2 opacity-70">
+                      {new Date(msg.timestamp).toLocaleTimeString()}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
