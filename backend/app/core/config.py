@@ -1,6 +1,10 @@
 from pydantic_settings import BaseSettings
 from typing import List, Optional
+from pathlib import Path
 import os
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 
 class Settings(BaseSettings):
     # API
@@ -23,10 +27,15 @@ class Settings(BaseSettings):
     CHROMA_DIR: str = "./chroma_db"
     COLLECTION_NAME: str = "sahakari_docs"
     
-    # File Upload
-    UPLOAD_DIR: str = "./uploads"
-    EXISTING_DOCS_DIR: str = "./data/documents"  # Folder for existing documents (PDF, CSV, TXT, Excel)
-    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    # RAG Accuracy Settings
+    RAG_TOP_K: int = 5  # Number of chunks to retrieve
+    RAG_SIMILARITY_THRESHOLD: float = 0.3  # Minimum similarity score (0-1, lower = more strict)
+    RAG_TEMPERATURE: float = 0.2  # Lower = more factual, less creative (0.0-1.0)
+    RAG_MAX_CONTEXT_LENGTH: int = 4000  # Maximum characters in context to prevent overflow
+    
+    # Documents
+    DOCUMENTS_DIR: str = str(PROJECT_ROOT / "data" / "documents")  # Folder for documents (PDF, CSV, TXT, Excel)
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB (for reference)
     ALLOWED_EXTENSIONS: List[str] = [".pdf", ".xlsx", ".xls", ".csv", ".txt"]
     
     # CORS
@@ -41,5 +50,6 @@ settings = Settings()
 
 # Create required directories
 os.makedirs(settings.CHROMA_DIR, exist_ok=True)
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-os.makedirs(settings.EXISTING_DOCS_DIR, exist_ok=True)
+docs_dir = Path(settings.DOCUMENTS_DIR).resolve()
+os.makedirs(docs_dir, exist_ok=True)
+settings.DOCUMENTS_DIR = str(docs_dir)

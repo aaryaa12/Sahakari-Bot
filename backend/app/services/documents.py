@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 class DocumentService:
     """Service for processing PDF, Excel, CSV, and TXT documents."""
     
-    def __init__(self):
-        self.upload_dir = Path(settings.UPLOAD_DIR)
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
-    
     def extract_text_from_pdf(self, file_path: str) -> List[Dict]:
         """Extract text from PDF with page numbers."""
         chunks = []
@@ -204,25 +200,6 @@ class DocumentService:
         else:
             raise ValueError(f"Unsupported file type: {file_ext}")
     
-    def save_file(self, content: bytes, filename: str) -> str:
-        """Save uploaded file and return path."""
-        # Sanitize filename
-        safe_filename = "".join(c for c in filename if c.isalnum() or c in "._- ")
-        file_path = self.upload_dir / safe_filename
-        
-        # Handle duplicate filenames
-        counter = 1
-        original_path = file_path
-        while file_path.exists():
-            stem = original_path.stem
-            suffix = original_path.suffix
-            file_path = self.upload_dir / f"{stem}_{counter}{suffix}"
-            counter += 1
-        
-        with open(file_path, "wb") as f:
-            f.write(content)
-        
-        return str(file_path)
 
 
 document_service = DocumentService()

@@ -101,9 +101,11 @@ class RAGService:
                 model_name = self._detect_model()
                 
                 logger.info(f"Initializing Ollama with model: {model_name}")
+                # Use lower temperature for more factual, accurate responses
+                temperature = getattr(settings, 'RAG_TEMPERATURE', 0.2)
                 self.llm = ChatOllama(
                     model=model_name,
-                    temperature=0.7,
+                    temperature=temperature,
                     base_url=self._base_url,
                     timeout=120.0  # Increase timeout for slower systems
                 )
@@ -172,7 +174,7 @@ class RAGService:
             "source": document_chunks[0]["source"] if document_chunks else "unknown"
         }
     
-    def query(self, user_query: str, top_k: int = 5) -> Dict:
+    def query(self, user_query: str, top_k: Optional[int] = None) -> Dict:
         """Query RAG system and generate response."""
         # Check if collection has documents
         collection_count = self.collection.count()
@@ -181,54 +183,105 @@ class RAGService:
         if collection_count == 0:
             return self._basic_chat(user_query)
         
+        # Get configuration values
+        default_top_k = getattr(settings, 'RAG_TOP_K', 5)
+        similarity_threshold = getattr(settings, 'RAG_SIMILARITY_THRESHOLD', 0.3)
+        max_context_length = getattr(settings, 'RAG_MAX_CONTEXT_LENGTH', 4000)
+        
+        top_k = top_k or default_top_k
+        
         # Generate query embedding
         query_embedding = embedding_service.embed_text(user_query)
         
-        # Search in ChromaDB
+        # Search in ChromaDB - retrieve more than needed for filtering
+        search_k = min(top_k * 2, collection_count)  # Get 2x for filtering
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=min(top_k, collection_count)
+            n_results=search_k
         )
         
-        # Extract relevant context
+        # Extract relevant context with similarity filtering
         contexts = []
         citations = []
+        total_context_length = 0
         
         if results["documents"] and len(results["documents"][0]) > 0:
             for i, doc in enumerate(results["documents"][0]):
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i] if "distances" in results else None
                 
+                # Calculate similarity score (1 - distance, where distance is typically 0-2)
+                # For cosine similarity, distance of 0 = perfect match, 2 = opposite
+                if distance is not None:
+                    # Normalize distance to similarity score (0-1)
+                    # Cosine distance ranges from 0 to 2, so similarity = 1 - (distance/2)
+                    similarity_score = 1 - (distance / 2.0)
+                    
+                    # Filter by similarity threshold
+                    if similarity_score < similarity_threshold:
+                        logger.debug(f"Skipping low-relevance chunk (similarity: {similarity_score:.3f} < {similarity_threshold})")
+                        continue
+                else:
+                    similarity_score = None
+                
+                # Check context length limit
+                doc_length = len(doc)
+                if total_context_length + doc_length > max_context_length and contexts:
+                    logger.debug(f"Reached context length limit ({max_context_length}), stopping retrieval")
+                    break
+                
                 contexts.append(doc)
+                total_context_length += doc_length
+                
                 citations.append({
                     "source": metadata.get("source", "Unknown"),
                     "page": metadata.get("page", "N/A"),
                     "excerpt": doc[:200] + "..." if len(doc) > 200 else doc,
-                    "relevance_score": round(1 - distance, 3) if distance else None
+                    "relevance_score": round(similarity_score, 3) if similarity_score is not None else None
                 })
+                
+                # Stop if we have enough high-quality contexts
+                if len(contexts) >= top_k:
+                    break
         
         if not contexts:
             return {
-                "answer": "I couldn't find relevant information in the uploaded documents to answer your question. Please try rephrasing or upload more documents.",
+                "answer": "I couldn't find relevant information in the uploaded documents to answer your question. The documents may not contain information about this topic, or the question might need to be rephrased. Please try:\n\n1. Rephrasing your question with different keywords\n2. Asking a more specific question\n3. Uploading additional relevant documents",
                 "citations": [],
                 "sources_count": 0
             }
         
-        # Create prompt with context
-        context_text = "\n\n".join([f"Context {i+1}:\n{ctx}" for i, ctx in enumerate(contexts)])
+        # Create prompt with context - improved for accuracy
+        # Build context with source information
+        context_parts = []
+        for i, ctx in enumerate(contexts):
+            source_name = citations[i]['source'] if i < len(citations) else "Unknown"
+            context_parts.append(f"[Context {i+1} from {source_name}]:\n{ctx}")
+        context_text = "\n\n".join(context_parts)
         
         prompt_template = ChatPromptTemplate.from_messages([
             ("system", """You are an expert AI assistant specializing in cybersecurity compliance and insider risk evaluation for cooperatives in Nepal. 
 You analyze regulations and cybersecurity frameworks to provide accurate, explainable guidance.
 
-Use the provided context documents to answer questions. Always be specific and cite information from the context.
-If the context doesn't contain enough information, say so clearly. Be precise and professional."""),
-            ("human", """Context from uploaded documents:
+CRITICAL INSTRUCTIONS:
+1. ONLY use information from the provided context documents to answer the question
+2. If the context doesn't contain enough information to fully answer the question, clearly state what information is missing
+3. DO NOT make up or infer information that is not explicitly stated in the context
+4. Be specific and cite which document/source your information comes from
+5. If you're uncertain, say so clearly
+6. Be precise, factual, and professional"""),
+            ("human", """Use ONLY the following context from uploaded documents to answer the question. Do not use any external knowledge.
+
+Context Documents:
 {context}
 
 User Question: {question}
 
-Provide a comprehensive answer based on the context above. Be specific and reference the relevant information.""")
+Instructions:
+- Answer based ONLY on the context provided above
+- If the context doesn't contain the answer, say "The provided documents do not contain information about [topic]. Please try rephrasing your question or upload relevant documents."
+- Be specific and reference which document your information comes from
+- Provide a clear, accurate answer based solely on the context""")
         ])
         
         # Generate response using Ollama

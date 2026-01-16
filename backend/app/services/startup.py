@@ -81,7 +81,7 @@ def load_existing_documents(force_reload: bool = False):
     Args:
         force_reload: If True, reprocess all files even if already ingested
     """
-    docs_dir = Path(settings.EXISTING_DOCS_DIR)
+    docs_dir = Path(settings.DOCUMENTS_DIR)
     
     if not docs_dir.exists():
         logger.info(f"Documents directory does not exist: {docs_dir}. Creating it...")

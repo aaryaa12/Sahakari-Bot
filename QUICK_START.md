@@ -51,13 +51,17 @@ npm start
 
 ## 📁 Add Your Documents
 
-Place your PDF/Excel files in:
+Place your PDF, CSV, TXT, or Excel files in:
 
 ```
 data/documents/
 ```
 
 The backend will automatically process them on startup!
+
+**To reload documents after adding new files:**
+- Restart the backend server, OR
+- Call: `POST /api/v1/documents/reload`
 
 ## 🎯 Test It
 
@@ -102,8 +106,8 @@ The backend will automatically process them on startup!
 
 - Test before presentation
 - Have Ollama running
-- Pre-process documents
-- Show both upload and existing files features
+- Pre-process documents (add to `data/documents/` folder)
+- Show document status in the chat interface
 
 ---
 
