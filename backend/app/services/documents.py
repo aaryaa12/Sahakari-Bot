@@ -3,10 +3,14 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Dict
 from app.core.config import settings
+import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentService:
-    """Service for processing PDF and Excel documents."""
+    """Service for processing PDF, Excel, CSV, and TXT documents."""
     
     def __init__(self):
         self.upload_dir = Path(settings.UPLOAD_DIR)
@@ -55,6 +59,136 @@ class DocumentService:
         
         return chunks
     
+    def extract_text_from_csv(self, file_path: str) -> List[Dict]:
+        """Extract text from CSV file."""
+        chunks = []
+        try:
+            # Try reading with pandas first (handles encoding better)
+            try:
+                # Read CSV with error handling
+                df = pd.read_csv(
+                    file_path, 
+                    encoding='utf-8', 
+                    on_bad_lines='skip',
+                    low_memory=False
+                )
+                text = df.to_string(index=False)
+            except UnicodeDecodeError:
+                # Fallback to different encodings
+                try:
+                    df = pd.read_csv(
+                        file_path, 
+                        encoding='latin-1', 
+                        on_bad_lines='skip',
+                        low_memory=False
+                    )
+                    text = df.to_string(index=False)
+                except Exception as e:
+                    logger.warning(f"Pandas CSV read failed, trying plain text: {e}")
+                    # Last resort: read as plain text
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        text = f.read()
+            except Exception as e:
+                logger.warning(f"CSV read error, trying plain text: {e}")
+                # Last resort: read as plain text
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    text = f.read()
+            
+            if text and text.strip():
+                # For very large CSV files, split into chunks
+                chunk_size = 10000  # Characters per chunk
+                if len(text) > chunk_size:
+                    lines = text.split('\n')
+                    current_chunk = ""
+                    chunk_num = 1
+                    
+                    for line in lines:
+                        if len(current_chunk) + len(line) > chunk_size and current_chunk:
+                            chunks.append({
+                                "text": current_chunk.strip(),
+                                "page": chunk_num,
+                                "source": Path(file_path).name,
+                                "type": "csv"
+                            })
+                            current_chunk = line + "\n"
+                            chunk_num += 1
+                        else:
+                            current_chunk += line + "\n"
+                    
+                    # Add remaining chunk
+                    if current_chunk.strip():
+                        chunks.append({
+                            "text": current_chunk.strip(),
+                            "page": chunk_num,
+                            "source": Path(file_path).name,
+                            "type": "csv"
+                        })
+                else:
+                    chunks.append({
+                        "text": text,
+                        "page": 1,
+                        "source": Path(file_path).name,
+                        "type": "csv"
+                    })
+        except Exception as e:
+            raise Exception(f"Error extracting CSV: {str(e)}")
+        
+        return chunks
+    
+    def extract_text_from_txt(self, file_path: str) -> List[Dict]:
+        """Extract text from TXT file."""
+        chunks = []
+        try:
+            # Try different encodings
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            text = None
+            
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        text = f.read()
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if text is None:
+                # Last resort: read with error handling
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    text = f.read()
+            
+            if text and text.strip():
+                # Split large text files into chunks by paragraphs or lines
+                lines = text.split('\n')
+                chunk_size = 5000  # Characters per chunk
+                current_chunk = ""
+                chunk_num = 1
+                
+                for line in lines:
+                    if len(current_chunk) + len(line) > chunk_size and current_chunk:
+                        chunks.append({
+                            "text": current_chunk.strip(),
+                            "page": chunk_num,
+                            "source": Path(file_path).name,
+                            "type": "txt"
+                        })
+                        current_chunk = line + "\n"
+                        chunk_num += 1
+                    else:
+                        current_chunk += line + "\n"
+                
+                # Add remaining chunk
+                if current_chunk.strip():
+                    chunks.append({
+                        "text": current_chunk.strip(),
+                        "page": chunk_num,
+                        "source": Path(file_path).name,
+                        "type": "txt"
+                    })
+        except Exception as e:
+            raise Exception(f"Error extracting TXT: {str(e)}")
+        
+        return chunks
+    
     def process_document(self, file_path: str) -> List[Dict]:
         """Process document based on file type."""
         file_ext = Path(file_path).suffix.lower()
@@ -63,6 +197,10 @@ class DocumentService:
             return self.extract_text_from_pdf(file_path)
         elif file_ext in [".xlsx", ".xls"]:
             return self.extract_text_from_excel(file_path)
+        elif file_ext == ".csv":
+            return self.extract_text_from_csv(file_path)
+        elif file_ext == ".txt":
+            return self.extract_text_from_txt(file_path)
         else:
             raise ValueError(f"Unsupported file type: {file_ext}")
     

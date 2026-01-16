@@ -123,7 +123,7 @@ class RAGService:
                 raise
         return self.llm
     
-    def ingest_document(self, file_path: str) -> Dict:
+    def ingest_document(self, file_path: str, file_hash: Optional[str] = None) -> Dict:
         """Process and ingest document into vector database."""
         # Extract text from document
         document_chunks = document_service.process_document(file_path)
@@ -140,12 +140,16 @@ class RAGService:
                 if text.strip():  # Only add non-empty chunks
                     chunk_id = str(uuid.uuid4())
                     all_texts.append(text)
-                    all_metadatas.append({
+                    metadata = {
                         "source": chunk["source"],
                         "page": str(chunk["page"]),
                         "type": chunk["type"],
                         "chunk_index": str(i)
-                    })
+                    }
+                    # Add file hash if provided (for change detection)
+                    if file_hash:
+                        metadata["file_hash"] = file_hash
+                    all_metadatas.append(metadata)
                     all_ids.append(chunk_id)
         
         if not all_texts:

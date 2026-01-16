@@ -25,9 +25,9 @@ class Settings(BaseSettings):
     
     # File Upload
     UPLOAD_DIR: str = "./uploads"
-    EXISTING_DOCS_DIR: str = "./data/documents"  # Folder for existing PDF/Excel files
+    EXISTING_DOCS_DIR: str = "./data/documents"  # Folder for existing documents (PDF, CSV, TXT, Excel)
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
-    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".xlsx", ".xls"]
+    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".xlsx", ".xls", ".csv", ".txt"]
     
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]

@@ -105,15 +105,30 @@ async def list_documents(
 
 @router.post("/documents/reload")
 async def reload_documents(
+    force: bool = False,
     current_user: dict = Depends(get_current_user)
 ):
-    """Manually reload existing documents from the documents folder."""
+    """
+    Manually reload existing documents from the documents folder.
+    
+    Args:
+        force: If True, reprocess all documents even if already ingested.
+               If False, only process new or modified documents.
+    """
     try:
         from app.services.startup import load_existing_documents
-        load_existing_documents()
+        load_existing_documents(force_reload=force)
+        
+        # Get updated status
+        from app.core.database import get_collection
+        collection = get_collection()
+        count = collection.count()
+        
         return {
             "status": "success",
-            "message": "Documents reloaded successfully"
+            "message": "Documents reloaded successfully",
+            "total_chunks": count,
+            "force_reload": force
         }
     except Exception as e:
         raise HTTPException(
