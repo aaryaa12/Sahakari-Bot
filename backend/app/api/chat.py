@@ -21,7 +21,8 @@ async def chat_query(
     try:
         result = rag_service.query(
             user_query=query.query,
-            top_k=query.top_k or 5
+            top_k=query.top_k or 5,
+            history=query.history
         )
         
         # Convert citations to response model

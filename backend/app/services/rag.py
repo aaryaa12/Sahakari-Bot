@@ -1,7 +1,7 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from app.core.database import get_collection
 from app.services.embeddings import embedding_service
 from app.services.documents import document_service
@@ -174,7 +174,7 @@ class RAGService:
             "source": document_chunks[0]["source"] if document_chunks else "unknown"
         }
     
-    def query(self, user_query: str, top_k: Optional[int] = None) -> Dict:
+    def query(self, user_query: str, top_k: Optional[int] = None, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """Query RAG system and generate response."""
         # Check if collection has documents
         collection_count = self.collection.count()
@@ -245,11 +245,13 @@ class RAGService:
                     break
         
         if not contexts:
+            history_text = self._history_text(history)
+            combined_text = f"{history_text}\n{user_query}".strip()
             # If no relevant context, allow in-domain general response
-            if self._is_in_domain(user_query) or self._is_greeting(user_query):
-                if self._is_risk_assessment_request(user_query) and not self._has_risk_details(user_query):
-                    return self._risk_assessment_prompt()
-                return self._basic_chat(user_query)
+            if self._is_in_domain(combined_text) or self._is_greeting(user_query):
+                if self._is_risk_assessment_request(combined_text) and not self._has_risk_details(combined_text):
+                    return self._risk_assessment_prompt(history=history)
+                return self._basic_chat(user_query, history=history)
             return {
                 "answer": settings.RAG_OUT_OF_DOMAIN_MESSAGE,
                 "citations": [],
@@ -269,13 +271,13 @@ class RAGService:
 You analyze regulations and cybersecurity frameworks to provide accurate, explainable guidance.
 
 CRITICAL INSTRUCTIONS:
-1. Prioritize information from the provided context documents.
-2. If you use general knowledge, clearly label it as "General guidance (not from documents)".
-3. Do NOT fabricate document-specific facts. Only cite what is in the documents.
-4. Be specific and cite which document/source your information comes from.
-5. If the context is partial, ask a clarifying question instead of guessing.
-6. Be precise, factual, and professional."""),
-            ("human", """Use the context documents below and answer the question.
+1. Use document context when it is relevant.
+2. You may use general domain knowledge to complete or clarify the answer.
+3. Do NOT fabricate document-specific facts. Only state document-backed facts that are present in the context.
+4. Do not mention internal steps or whether information comes from documents in the response body.
+5. Be precise, factual, and professional."""),
+            ("human", """Conversation so far:
+{history}
 
 Context Documents:
 {context}
@@ -283,9 +285,10 @@ Context Documents:
 User Question: {question}
 
 Instructions:
-- Use document-backed facts where available and cite sources.
-- If adding general guidance, label it clearly as "General guidance (not from documents)".
-- If the context doesn't cover the question, ask a brief clarifying question.""")
+- Provide a clear, direct answer.
+- Include document-backed details only when they are relevant.
+- If the user asks for a risk assessment, ask the minimum necessary follow-up questions.
+- Do not mention internal steps or data sources in the response body.""")
         ])
         
         # Generate response using Ollama
@@ -293,7 +296,8 @@ Instructions:
         try:
             messages = prompt_template.format_messages(
                 context=context_text,
-                question=user_query
+                question=user_query,
+                history=self._history_text(history)
             )
             
             llm = self._get_llm()  # Lazy initialization
@@ -316,7 +320,7 @@ Instructions:
             "sources_count": len(citations)
         }
     
-    def _basic_chat(self, user_query: str) -> Dict:
+    def _basic_chat(self, user_query: str, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """General chat mode for in-domain queries when no relevant documents are found."""
         try:
             llm = self._get_llm()  # Lazy initialization
@@ -340,10 +344,16 @@ If the user wants a cooperative cyber risk evaluation, do this:
 
 If the question is outside this scope, respond with:
 \""" + settings.RAG_OUT_OF_DOMAIN_MESSAGE + "\""""),
-                ("human", "{question}")
+                ("human", """Conversation so far:
+{history}
+
+User Question: {question}""")
             ])
             
-            messages = prompt_template.format_messages(question=user_query)
+            messages = prompt_template.format_messages(
+                question=user_query,
+                history=self._history_text(history)
+            )
             response = llm.invoke(messages)
             answer = response.content if hasattr(response, 'content') else str(response)
             
@@ -374,6 +384,23 @@ If the question is outside this scope, respond with:
                 "sources_count": 0
             }
 
+    def _history_text(self, history: Optional[List[Dict[str, Any]]]) -> str:
+        """Flatten recent conversation into a single text block."""
+        if not history:
+            return ""
+        parts = []
+        for msg in history[-8:]:
+            if hasattr(msg, "role") and hasattr(msg, "content"):
+                role = msg.role
+                content = msg.content
+            else:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+            if not content:
+                continue
+            parts.append(f"{role}: {content}")
+        return "\n".join(parts)
+
     def _is_risk_assessment_request(self, user_query: str) -> bool:
         """Detect if user wants a cooperative cyber risk assessment."""
         query = user_query.lower()
@@ -397,23 +424,42 @@ If the question is outside this scope, respond with:
         ]
         return any(d in query for d in details)
 
-    def _risk_assessment_prompt(self) -> Dict:
+    def _risk_assessment_prompt(self, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """Return a structured questionnaire for cooperative risk assessment."""
-        questions = [
-            "How many employees and branches does your cooperative have?",
-            "What core systems do you use (core banking, accounting, mobile/online services)?",
-            "Where is your data hosted (on‑premise, cloud, hybrid)?",
-            "Do you use MFA/2FA for staff access and admin accounts?",
-            "Do you have regular backups and a disaster recovery plan?",
-            "Have you had any security incidents or data breaches in the last 12 months?",
-            "Do staff receive cybersecurity awareness training? How often?",
-            "Do you have documented policies (access control, incident response, data privacy)?",
-            "What type of sensitive data do you store (PII, financial records, member data)?"
-        ]
-        formatted = "To evaluate your cooperative’s cybersecurity risk, please answer:\n\n"
-        formatted += "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
-        formatted += "\n\nOnce you answer, I will rate risk (Low/Medium/High) and provide prioritized recommendations."
-        return {"answer": formatted, "citations": [], "sources_count": 0}
+        try:
+            llm = self._get_llm()
+            prompt_template = ChatPromptTemplate.from_messages([
+                ("system", """You are Sahakari Bot. The user wants a cybersecurity risk evaluation for their cooperative.
+Ask a concise set of questions (8–10) to gather the minimum necessary details before rating risk.
+Keep the questions short, clear, and practical. Use bullet points. No extra explanation."""),
+                ("human", """Conversation so far:
+{history}
+
+User Question: {question}""")
+            ])
+            messages = prompt_template.format_messages(
+                question="Please start the cooperative cybersecurity risk evaluation.",
+                history=self._history_text(history)
+            )
+            response = llm.invoke(messages)
+            answer = response.content if hasattr(response, "content") else str(response)
+            return {"answer": answer, "citations": [], "sources_count": 0}
+        except Exception:
+            questions = [
+                "How many employees and branches does your cooperative have?",
+                "What core systems do you use (core banking, accounting, mobile/online services)?",
+                "Where is your data hosted (on‑premise, cloud, hybrid)?",
+                "Do you use MFA/2FA for staff access and admin accounts?",
+                "Do you have regular backups and a disaster recovery plan?",
+                "Have you had any security incidents or data breaches in the last 12 months?",
+                "Do staff receive cybersecurity awareness training? How often?",
+                "Do you have documented policies (access control, incident response, data privacy)?",
+                "What type of sensitive data do you store (PII, financial records, member data)?"
+            ]
+            formatted = "To evaluate your cooperative’s cybersecurity risk, please answer:\n\n"
+            formatted += "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
+            formatted += "\n\nOnce you answer, I will rate risk (Low/Medium/High) and provide prioritized recommendations."
+            return {"answer": formatted, "citations": [], "sources_count": 0}
 
     def _is_in_domain(self, user_query: str) -> bool:
         """Check if query is within the project's domain."""

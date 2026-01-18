@@ -25,11 +25,6 @@ const Chat = () => {
     : docStatus
     ? "No documents yet"
     : "Checking documents...";
-  const statusTone = docStatus?.has_documents
-    ? "bg-emerald-900/30 text-emerald-200 border-emerald-700"
-    : docStatus?.folder_count > 0
-    ? "bg-amber-900/30 text-amber-200 border-amber-700"
-    : "bg-slate-800 text-slate-300 border-slate-700";
   const statusIcon = docStatus?.has_documents
     ? "✅"
     : docStatus?.folder_count > 0
@@ -115,7 +110,15 @@ const Chat = () => {
     setLoading(true);
 
     try {
-      const response = await chatAPI.query({ query: input.trim() });
+      const history = messages
+        .filter((msg) => msg.type === "user" || msg.type === "bot")
+        .slice(-8)
+        .map((msg) => ({
+          role: msg.type === "user" ? "user" : "assistant",
+          content: msg.content,
+        }));
+
+      const response = await chatAPI.query({ query: input.trim(), history });
       const botMessage = {
         id: Date.now() + 1,
         type: "bot",
@@ -149,7 +152,7 @@ const Chat = () => {
   return (
     <div className="flex flex-col h-screen bg-[#0b1220] text-slate-100">
       {/* Header */}
-      <header className="bg-slate-900/80 border-b border-slate-800 backdrop-blur sticky top-0 z-10">
+      <header className="bg-[#0b1220]/80 border-b border-slate-900 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex flex-wrap gap-4 justify-between items-center py-3">
             <div className="flex items-center space-x-3">
@@ -164,15 +167,10 @@ const Chat = () => {
                 <h1 className="text-sm font-semibold text-slate-100 tracking-tight">
                   Sahakari Bot
                 </h1>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 border rounded-full ${statusTone}`}
-                  >
-                    <span>{statusIcon}</span>
-                    {statusLabel}
-                  </span>
-                  <span className="hidden sm:inline">Compliance assistant</span>
-                </div>
+                <p className="text-[11px] text-slate-400 flex items-center gap-2">
+                  <span>{statusIcon}</span>
+                  {statusLabel}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -202,20 +200,8 @@ const Chat = () => {
         <div className="max-w-3xl w-full mx-auto">
           {messages.length === 0 ? (
             <div className="text-center mt-10 sm:mt-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-2xl mb-6 shadow-sm border border-slate-800">
-                <svg
-                  className="w-8 h-8 text-slate-100"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-2xl mb-6 shadow-sm border border-slate-800 overflow-hidden">
+                <img src={logo} alt="Sahakari Bot" className="w-10 h-10 object-contain" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-semibold text-slate-100 mb-3">
                 How can I help you today?
@@ -268,124 +254,64 @@ const Chat = () => {
               </div>
             </div>
           ) : (
-            <div className="space-y-0 pb-6">
+            <div className="space-y-6 pb-6">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`border-b border-slate-800 ${
-                    msg.type === "user" ? "bg-[#0b1220]" : "bg-slate-950"
-                  }`}
+                  className="w-full"
                 >
                   <div
-                    className={`max-w-3xl mx-auto px-4 sm:px-6 py-6 flex ${
+                    className={`max-w-3xl mx-auto px-4 sm:px-6 flex ${
                       msg.type === "user" ? "justify-end" : "justify-start"
                     }`}
                   >
-                    <div
-                      className={`flex items-start gap-4 ${
-                        msg.type === "user" ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {msg.type !== "user" && (
-                        <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${
-                            msg.type === "error"
-                              ? "bg-red-900/40 text-red-200"
-                              : "bg-slate-100 text-slate-900"
-                          }`}
-                        >
-                          {msg.type === "error" ? "!" : "SB"}
+                    {msg.type === "user" ? (
+                      <div className="flex items-end gap-3 max-w-[78%]">
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 text-sm sm:text-base text-slate-100 shadow-sm">
+                          <p className="whitespace-pre-wrap leading-relaxed">
+                            {msg.content}
+                          </p>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-[240px]">
-                        <div className="text-xs font-semibold text-slate-400 mb-2">
-                          {msg.type === "user"
-                            ? "You"
-                            : msg.type === "error"
-                            ? "System"
-                            : "Sahakari Bot"}
-                        </div>
-                        <p className="whitespace-pre-wrap leading-relaxed text-sm sm:text-base text-slate-100">
-                          {msg.content}
-                        </p>
-                        {msg.citations && msg.citations.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-slate-800 border-opacity-80">
-                            <p className="text-xs font-semibold text-slate-400 mb-2 flex items-center">
-                              <svg
-                                className="w-4 h-4 mr-1"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                              </svg>
-                              Sources ({msg.citations.length})
-                            </p>
-                            <div className="space-y-1.5">
-                              {msg.citations.map((citation, idx) => (
-                                <div
-                                  key={idx}
-                                  className="text-xs text-slate-300 bg-slate-900 rounded-lg px-2 py-1.5"
-                                >
-                                  <span className="font-medium">
-                                    📄 {citation.source}
-                                  </span>
-                                  {citation.page && (
-                                    <span className="text-slate-500">
-                                      {" "}
-                                      • Page {citation.page}
-                                    </span>
-                                  )}
-                                  {citation.relevance_score && (
-                                    <span className="text-slate-500">
-                                      {" "}
-                                      • Relevance:{" "}
-                                      {(citation.relevance_score * 100).toFixed(
-                                        0
-                                      )}
-                                      %
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <p className="text-xs mt-2 text-slate-500">
-                          {new Date(msg.timestamp).toLocaleTimeString()}
-                        </p>
-                      </div>
-                      {msg.type === "user" && (
-                        <div className="w-9 h-9 rounded-full bg-blue-500 text-white text-xs font-semibold flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 text-white text-xs font-semibold flex items-center justify-center">
                           {userInitial}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3 max-w-[78%]">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center overflow-hidden">
+                          {msg.type === "error" ? (
+                            <span className="text-xs font-semibold">!</span>
+                          ) : (
+                            <img
+                              src={logo}
+                              alt="Sahakari Bot"
+                              className="w-4 h-4 object-contain"
+                            />
+                          )}
+                        </div>
+                        <div className="text-sm sm:text-base text-slate-100 leading-relaxed">
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
               {loading && (
-                <div className="border-b border-slate-800 bg-slate-950">
-                  <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold flex items-center justify-center">
-                      SB
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      ></div>
-                    </div>
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center overflow-hidden">
+                    <img src={logo} alt="Sahakari Bot" className="w-4 h-4 object-contain" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                    <div
+                      className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    ></div>
                   </div>
                 </div>
               )}

@@ -29,9 +29,15 @@ class Token(BaseModel):
 
 
 # Chat Schemas
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
 class ChatQuery(BaseModel):
     query: str
     top_k: Optional[int] = 5
+    history: Optional[List[ChatMessage]] = None
 
 
 class Citation(BaseModel):
