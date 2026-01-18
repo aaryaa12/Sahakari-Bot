@@ -11,6 +11,7 @@ const Chat = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [docStatus, setDocStatus] = useState(null);
+  const [animateTitle, setAnimateTitle] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -36,6 +37,11 @@ const Chat = () => {
 
   useEffect(() => {
     loadDocumentStatus();
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setAnimateTitle(false), 2600);
+    return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
@@ -94,14 +100,13 @@ const Chat = () => {
     navigate("/login");
   };
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const sendMessage = async (message) => {
+    if (!message.trim() || loading) return;
 
     const userMessage = {
       id: Date.now(),
       type: "user",
-      content: input.trim(),
+      content: message.trim(),
       timestamp: new Date(),
     };
 
@@ -118,7 +123,7 @@ const Chat = () => {
           content: msg.content,
         }));
 
-      const response = await chatAPI.query({ query: input.trim(), history });
+      const response = await chatAPI.query({ query: message.trim(), history });
       const botMessage = {
         id: Date.now() + 1,
         type: "bot",
@@ -140,6 +145,16 @@ const Chat = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    await sendMessage(input);
+  };
+
+  const handlePromptClick = async (prompt) => {
+    setInput(prompt);
+    await sendMessage(prompt);
   };
 
   const handleKeyPress = (e) => {
@@ -184,12 +199,6 @@ const Chat = () => {
                   Reload
                 </button>
               )}
-              <div className="hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-full px-3 py-1.5">
-                <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-900 text-xs flex items-center justify-center">
-                  {userInitial}
-                </span>
-                <span className="text-sm text-slate-200">{user?.username}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -200,15 +209,28 @@ const Chat = () => {
         <div className="max-w-3xl w-full mx-auto">
           {messages.length === 0 ? (
             <div className="text-center mt-10 sm:mt-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-2xl mb-6 shadow-sm border border-slate-800 overflow-hidden">
-                <img src={logo} alt="Sahakari Bot" className="w-10 h-10 object-contain" />
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-900 rounded-3xl mb-8 shadow-lg overflow-hidden mx-auto">
+                <img
+                  src={logo}
+                  alt="Sahakari Bot"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-slate-100 mb-3">
-                How can I help you today?
+              <p className="text-slate-400 text-sm sm:text-base mb-2">
+                Hi, {user?.username || "there"}
+              </p>
+              <h2
+                className={`text-2xl sm:text-3xl font-semibold text-slate-100 mb-3 inline-block max-w-full ${
+                  animateTitle ? "typing-once" : ""
+                }`}
+                style={animateTitle ? { "--chars": 29 } : undefined}
+              >
+                Can I help you with anything?
               </h2>
-              <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-                Ask about cybersecurity compliance, regulations, or risk
-                management. Answers are grounded in your document library.
+              <p className="text-slate-400 mb-8 max-w-xl mx-auto text-sm sm:text-base">
+                Get clear, citation-backed answers on compliance, audits, and
+                risk controls. Ask anything about your policy library to get
+                started.
               </p>
               {!docStatus?.has_documents && (
                 <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 text-left shadow-sm">
@@ -240,16 +262,18 @@ const Chat = () => {
               )}
               <div className="grid gap-3 sm:grid-cols-3 max-w-3xl mx-auto text-left">
                 {[
-                  "What are the password requirements?",
-                  "How should we handle insider threats?",
-                  "What are the data protection guidelines?",
+                  "Which policies define incident response timelines?",
+                  "Summarize our vendor risk assessment requirements.",
+                  "What controls cover data retention and deletion?",
                 ].map((prompt) => (
-                  <div
+                  <button
                     key={prompt}
-                    className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm text-slate-200 shadow-sm"
+                    type="button"
+                    onClick={() => handlePromptClick(prompt)}
+                    className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm text-slate-200 shadow-sm text-left hover:border-blue-500/40 hover:bg-slate-800 transition"
                   >
                     {prompt}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -277,8 +301,8 @@ const Chat = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-start gap-3 max-w-[78%]">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center overflow-hidden">
+                      <div className="flex items-start gap-3 w-full">
+                        <div className="w-8 h-8 min-w-[32px] rounded-full bg-slate-100 text-slate-900 flex items-center justify-center overflow-hidden">
                           {msg.type === "error" ? (
                             <span className="text-xs font-semibold">!</span>
                           ) : (
@@ -289,7 +313,7 @@ const Chat = () => {
                             />
                           )}
                         </div>
-                        <div className="text-sm sm:text-base text-slate-100 leading-relaxed">
+                        <div className="text-sm sm:text-base text-slate-100 leading-relaxed flex-1">
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
                       </div>
@@ -386,12 +410,12 @@ const Chat = () => {
       </div>
 
       {/* Bottom-left profile */}
-      <div className="fixed bottom-4 left-4 z-20">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-lg w-64">
+      <div className="fixed bottom-4 left-4 z-20 animate-float-slow">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-lg w-64 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-blue-500/40">
           <button
             type="button"
             onClick={() => setProfileOpen((prev) => !prev)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800 rounded-2xl transition"
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800/80 rounded-2xl transition"
             aria-expanded={profileOpen}
           >
             <span className="w-9 h-9 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold flex items-center justify-center">

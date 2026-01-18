@@ -83,28 +83,30 @@ const Home = ({ initialAuthMode = null }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b1220] text-slate-100">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.15),_transparent_55%)] pointer-events-none" />
-      <header className="relative z-10 border-b border-slate-800 bg-slate-950/60 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#0b1220] text-slate-100 overflow-hidden relative">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_55%)] pointer-events-none" />
+      <div className="absolute -right-24 top-20 h-72 w-72 bg-blue-600/20 blur-3xl rounded-full pointer-events-none animate-pulse" />
+      <div className="absolute left-10 bottom-20 h-40 w-40 bg-purple-500/20 blur-3xl rounded-full pointer-events-none animate-pulse" />
+
+      <header className="relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden">
               <img src={logo} alt="Sahakari Bot" className="w-full h-full object-contain" />
             </div>
-            <div>
-              <p className="text-sm font-semibold">Sahakari Bot</p>
-              <p className="text-xs text-slate-400">Compliance intelligence</p>
-            </div>
+            <span className="text-sm font-semibold tracking-wide">
+              Sahakari Bot
+            </span>
           </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-slate-400">
-            <a className="hover:text-slate-100 transition" href="#features">
-              Features
+          <nav className="hidden md:flex items-center gap-8 text-xs uppercase tracking-[0.2em] text-slate-400">
+            <a className="hover:text-white transition" href="#about">
+              About
             </a>
-            <a className="hover:text-slate-100 transition" href="#workflow">
-              Workflow
+            <a className="hover:text-white transition" href="#platform">
+              Platform
             </a>
-            <a className="hover:text-slate-100 transition" href="#security">
-              Security
+            <a className="hover:text-white transition" href="#assurance">
+              Assurance
             </a>
           </nav>
           <div className="flex items-center gap-2">
@@ -138,22 +140,22 @@ const Home = ({ initialAuthMode = null }) => {
       </header>
 
       <main className="relative z-10">
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 lg:py-24">
-          <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center">
+        <section id="about" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-20">
+          <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400 mb-4">
-                Compliance copilots for high-trust teams
+              <p className="text-xs uppercase tracking-[0.4em] text-slate-400 mb-4">
+                Compliance intelligence
               </p>
-              <h1 className="text-3xl sm:text-5xl font-semibold leading-tight">
-                Navigate cybersecurity standards with confidence using your own
-                documents.
+              <h1 className="text-4xl sm:text-6xl font-semibold leading-tight">
+                SAHAKARI
+                <span className="text-blue-400"> BOT</span>
               </h1>
               <p className="mt-5 text-slate-400 text-base sm:text-lg max-w-xl">
-                Sahakari Bot turns internal policies, audit reports, and
-                regulatory documents into a secure, searchable assistant—built
-                for risk managers, compliance officers, and security leaders.
+                Transform complex security policies into clear, actionable
+                guidance. Sahakari Bot helps teams answer compliance questions
+                with traceable references and instant insights.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-8 flex flex-wrap gap-4">
                 {user ? (
                   <Link
                     to="/chat"
@@ -180,82 +182,90 @@ const Home = ({ initialAuthMode = null }) => {
                   </>
                 )}
               </div>
-              <div className="mt-8 grid grid-cols-3 gap-4 max-w-md">
-                {[
-                  { label: "Policies indexed", value: "1.2k+" },
-                  { label: "Avg. response", value: "4.6s" },
-                  { label: "Audit ready", value: "99%" },
-                ].map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4"
-                  >
-                    <p className="text-lg font-semibold">{stat.value}</p>
-                    <p className="text-xs text-slate-400">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-xl">
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-4">
-                <span>Live workspace</span>
-                <span className="bg-slate-800 text-slate-200 px-2 py-1 rounded-full">
-                  Secure mode
+              <div className="mt-10 flex items-center gap-6 text-xs text-slate-400">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Verified sources
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                  Secure by design
                 </span>
               </div>
-              <div className="space-y-4">
-                <div className="bg-[#0b1220] border border-slate-800 rounded-2xl p-4 text-sm text-slate-200">
-                  Which policies define incident response reporting timelines?
+            </div>
+
+            <div className="relative">
+              <div className="absolute -top-8 -left-8 h-24 w-24 border border-slate-700/50 rounded-3xl rotate-12" />
+              <div className="absolute -bottom-10 right-8 h-16 w-16 border border-slate-700/50 rounded-2xl -rotate-6" />
+              <div className="bg-slate-950/80 border border-slate-800 rounded-[2.5rem] p-6 shadow-2xl">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-6">
+                  <span className="uppercase tracking-[0.3em]">Live</span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                  </span>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm text-slate-100">
-                  The Incident Response Standard v4.2 requires notification
-                  within 72 hours for P1 incidents. See section 3.1 and Appendix
-                  B for SLA exceptions.
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
-                  Sources: IR-Standard.pdf • Page 12 • Relevance 93%
+                <div className="space-y-4">
+                  <div className="text-3xl font-semibold tracking-tight">
+                    Policy Intelligence
+                  </div>
+                  <p className="text-sm text-slate-400">
+                    Consolidate regulatory obligations, audit actions, and
+                    security requirements into a single command center.
+                  </p>
+                  <div className="grid gap-3">
+                    {[
+                      "Incident response timelines",
+                      "Vendor risk due diligence",
+                      "Zero-trust access controls",
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="bg-[#0b1220] border border-slate-800 rounded-2xl px-4 py-3 text-sm text-slate-200 flex items-center justify-between"
+                      >
+                        <span>{item}</span>
+                        <span className="text-blue-400">→</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-400 pt-2">
+                    <span>Updated recently</span>
+                    <span className="flex items-center gap-2">
+                      <img src={logo} alt="Sahakari Bot" className="w-4 h-4 object-contain" />
+                      Sahakari AI
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="mt-12 flex flex-wrap items-center justify-between gap-6 text-xs uppercase tracking-[0.3em] text-slate-500">
+            <span>01 Governance</span>
+            <span>02 Risk</span>
+            <span>03 Compliance</span>
+            <span>04 Reporting</span>
           </div>
         </section>
 
-        <section
-          id="features"
-          className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16"
-        >
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                Purpose built
-              </p>
-              <h2 className="text-2xl sm:text-3xl font-semibold mt-2">
-                A professional compliance workspace.
-              </h2>
-            </div>
-            <p className="text-sm text-slate-400 max-w-md">
-              Keep your team aligned with a single source of truth and audit
-              ready citations, aligned to regulatory requirements.
-            </p>
-          </div>
+        <section id="platform" className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                title: "Citation-ready answers",
-                desc: "Every response includes document citations for audit trails and executive reporting.",
+                title: "Context-rich answers",
+                desc: "Every response links to source documents for audit-grade confidence.",
               },
               {
-                title: "Policy-aware memory",
-                desc: "Contextual understanding tied to your policies, standards, and risk registers.",
+                title: "Adaptive guidance",
+                desc: "Understand policy gaps and recommend next-best actions instantly.",
               },
               {
-                title: "Operational speed",
-                desc: "Accelerate assessments, vendor reviews, and policy updates in seconds.",
+                title: "Executive-ready insights",
+                desc: "Summaries tailored for leadership, compliance, and security teams.",
               },
             ].map((card) => (
               <div
                 key={card.title}
-                className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6"
+                className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 hover:border-blue-500/40 transition"
               >
                 <h3 className="text-lg font-semibold mb-3">{card.title}</h3>
                 <p className="text-sm text-slate-400">{card.desc}</p>
@@ -264,99 +274,15 @@ const Home = ({ initialAuthMode = null }) => {
           </div>
         </section>
 
-        <section
-          id="workflow"
-          className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16"
-        >
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold mb-3">Focused workflows</h3>
-              <p className="text-sm text-slate-400 mb-6">
-                Organize compliance activities across regulations, audits, and
-                internal policy updates without switching tools.
-              </p>
-              <ul className="space-y-3 text-sm text-slate-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400">•</span>
-                  Prepare audit responses with linked evidence.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400">•</span>
-                  Track coverage of regulatory obligations.
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400">•</span>
-                  Summarize risk controls for leadership updates.
-                </li>
-              </ul>
-            </div>
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold mb-3">Insights dashboard</h3>
-              <p className="text-sm text-slate-400 mb-6">
-                Quickly validate compliance posture with smart summaries, gap
-                highlights, and recommended follow-ups.
-              </p>
-              <div className="grid gap-4">
-                {[
-                  "Policy coverage gap: Vendor due diligence",
-                  "Upcoming audit: ISO 27001 readiness",
-                  "Open items: 4 controls pending review",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="bg-[#0b1220] border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-300"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="security"
-          className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16"
-        >
-          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-8 md:p-10">
-            <div className="grid md:grid-cols-3 gap-8">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                  Security first
-                </p>
-                <h3 className="text-2xl font-semibold mt-3">
-                  Built for regulated environments.
-                </h3>
-              </div>
-              <div className="md:col-span-2 grid sm:grid-cols-2 gap-6 text-sm text-slate-300">
-                {[
-                  "Private document processing with role-based access.",
-                  "Audit-grade logging for every response.",
-                  "Data retention aligned with internal policies.",
-                  "Configurable AI guardrails for policy consistency.",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-20">
-          <div className="bg-gradient-to-r from-blue-600/20 via-slate-900 to-slate-950 border border-blue-500/30 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <section id="assurance" className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+          <div className="bg-gradient-to-r from-slate-950 via-[#0b1220] to-slate-900 border border-slate-800 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h3 className="text-2xl font-semibold">
-                Ready to build your compliance workspace?
-              </h3>
-              <p className="text-sm text-slate-300 mt-3 max-w-xl">
-                Invite your team, connect your policies, and start asking
-                confident questions with traceable answers.
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                Assurance ready
               </p>
+              <h3 className="text-2xl font-semibold mt-3">
+                Bring audit-grade intelligence to every decision.
+              </h3>
             </div>
             <div className="flex items-center gap-3">
               {user ? (
