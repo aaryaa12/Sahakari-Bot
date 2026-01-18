@@ -59,73 +59,69 @@ class DocumentService:
         """Extract text from CSV file."""
         chunks = []
         try:
+            max_rows = getattr(settings, "CSV_MAX_ROWS", 5000)
+            chunk_rows = getattr(settings, "CSV_CHUNK_ROWS", 1000)
+
             # Try reading with pandas first (handles encoding better)
-            try:
-                # Read CSV with error handling
-                df = pd.read_csv(
-                    file_path, 
-                    encoding='utf-8', 
-                    on_bad_lines='skip',
-                    low_memory=False
-                )
-                text = df.to_string(index=False)
-            except UnicodeDecodeError:
-                # Fallback to different encodings
-                try:
-                    df = pd.read_csv(
-                        file_path, 
-                        encoding='latin-1', 
-                        on_bad_lines='skip',
-                        low_memory=False
-                    )
-                    text = df.to_string(index=False)
-                except Exception as e:
-                    logger.warning(f"Pandas CSV read failed, trying plain text: {e}")
-                    # Last resort: read as plain text
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        text = f.read()
-            except Exception as e:
-                logger.warning(f"CSV read error, trying plain text: {e}")
-                # Last resort: read as plain text
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    text = f.read()
-            
-            if text and text.strip():
-                # For very large CSV files, split into chunks
-                chunk_size = 10000  # Characters per chunk
-                if len(text) > chunk_size:
-                    lines = text.split('\n')
-                    current_chunk = ""
-                    chunk_num = 1
-                    
-                    for line in lines:
-                        if len(current_chunk) + len(line) > chunk_size and current_chunk:
-                            chunks.append({
-                                "text": current_chunk.strip(),
-                                "page": chunk_num,
-                                "source": Path(file_path).name,
-                                "type": "csv"
-                            })
-                            current_chunk = line + "\n"
-                            chunk_num += 1
-                        else:
-                            current_chunk += line + "\n"
-                    
-                    # Add remaining chunk
-                    if current_chunk.strip():
+            def read_csv_chunks(encoding: str):
+                nonlocal chunks
+                processed_rows = 0
+                for df_chunk in pd.read_csv(
+                    file_path,
+                    encoding=encoding,
+                    on_bad_lines="skip",
+                    low_memory=False,
+                    chunksize=chunk_rows,
+                ):
+                    if processed_rows >= max_rows:
+                        break
+                    # Trim chunk if it exceeds max rows
+                    remaining = max_rows - processed_rows
+                    if remaining <= 0:
+                        break
+                    if len(df_chunk) > remaining:
+                        df_chunk = df_chunk.head(remaining)
+                    text = df_chunk.to_string(index=False)
+                    if text and text.strip():
                         chunks.append({
-                            "text": current_chunk.strip(),
-                            "page": chunk_num,
+                            "text": text,
+                            "page": (processed_rows // chunk_rows) + 1,
                             "source": Path(file_path).name,
                             "type": "csv"
                         })
-                else:
-                    chunks.append({
-                        "text": text,
-                        "page": 1,
-                        "source": Path(file_path).name,
-                        "type": "csv"
-                    })
+                    processed_rows += len(df_chunk)
+
+            try:
+                read_csv_chunks("utf-8")
+            except UnicodeDecodeError:
+                try:
+                    read_csv_chunks("latin-1")
+                except Exception as e:
+                    logger.warning(f"Pandas CSV read failed, trying plain text: {e}")
+                    # Last resort: read as plain text (limited)
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        text = "".join([next(f) for _ in range(max_rows)]).strip()
+                        if text:
+                            chunks.append({
+                                "text": text,
+                                "page": 1,
+                                "source": Path(file_path).name,
+                                "type": "csv"
+                            })
+            except Exception as e:
+                logger.warning(f"CSV read error, trying plain text: {e}")
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    text = "".join([next(f) for _ in range(max_rows)]).strip()
+                    if text:
+                        chunks.append({
+                            "text": text,
+                            "page": 1,
+                            "source": Path(file_path).name,
+                            "type": "csv"
+                        })
+            
+            if not chunks:
+                raise ValueError("No readable content found in CSV")
         except Exception as e:
             raise Exception(f"Error extracting CSV: {str(e)}")
         

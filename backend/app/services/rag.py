@@ -245,8 +245,13 @@ class RAGService:
                     break
         
         if not contexts:
+            # If no relevant context, allow in-domain general response
+            if self._is_in_domain(user_query) or self._is_greeting(user_query):
+                if self._is_risk_assessment_request(user_query) and not self._has_risk_details(user_query):
+                    return self._risk_assessment_prompt()
+                return self._basic_chat(user_query)
             return {
-                "answer": "I couldn't find relevant information in the uploaded documents to answer your question. The documents may not contain information about this topic, or the question might need to be rephrased. Please try:\n\n1. Rephrasing your question with different keywords\n2. Asking a more specific question\n3. Uploading additional relevant documents",
+                "answer": settings.RAG_OUT_OF_DOMAIN_MESSAGE,
                 "citations": [],
                 "sources_count": 0
             }
@@ -260,17 +265,17 @@ class RAGService:
         context_text = "\n\n".join(context_parts)
         
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert AI assistant specializing in cybersecurity compliance and insider risk evaluation for cooperatives in Nepal. 
+            ("system", """You are an expert AI assistant specializing in cybersecurity compliance, insider risk management, cooperative regulation in Nepal, governance/audit, data privacy, and network security.
 You analyze regulations and cybersecurity frameworks to provide accurate, explainable guidance.
 
 CRITICAL INSTRUCTIONS:
-1. ONLY use information from the provided context documents to answer the question
-2. If the context doesn't contain enough information to fully answer the question, clearly state what information is missing
-3. DO NOT make up or infer information that is not explicitly stated in the context
-4. Be specific and cite which document/source your information comes from
-5. If you're uncertain, say so clearly
-6. Be precise, factual, and professional"""),
-            ("human", """Use ONLY the following context from uploaded documents to answer the question. Do not use any external knowledge.
+1. Prioritize information from the provided context documents.
+2. If you use general knowledge, clearly label it as "General guidance (not from documents)".
+3. Do NOT fabricate document-specific facts. Only cite what is in the documents.
+4. Be specific and cite which document/source your information comes from.
+5. If the context is partial, ask a clarifying question instead of guessing.
+6. Be precise, factual, and professional."""),
+            ("human", """Use the context documents below and answer the question.
 
 Context Documents:
 {context}
@@ -278,10 +283,9 @@ Context Documents:
 User Question: {question}
 
 Instructions:
-- Answer based ONLY on the context provided above
-- If the context doesn't contain the answer, say "The provided documents do not contain information about [topic]. Please try rephrasing your question or upload relevant documents."
-- Be specific and reference which document your information comes from
-- Provide a clear, accurate answer based solely on the context""")
+- Use document-backed facts where available and cite sources.
+- If adding general guidance, label it clearly as "General guidance (not from documents)".
+- If the context doesn't cover the question, ask a brief clarifying question.""")
         ])
         
         # Generate response using Ollama
@@ -313,14 +317,29 @@ Instructions:
         }
     
     def _basic_chat(self, user_query: str) -> Dict:
-        """Basic chat mode when no documents are available - uses Ollama directly."""
+        """General chat mode for in-domain queries when no relevant documents are found."""
         try:
             llm = self._get_llm()  # Lazy initialization
             
             # Create a simple prompt for general chat
             prompt_template = ChatPromptTemplate.from_messages([
-                ("system", """You are Sahakari Bot, a helpful AI assistant specializing in cybersecurity compliance and insider risk evaluation for cooperatives in Nepal. 
-You provide friendly, professional assistance. If asked about compliance or regulations, mention that you can provide more detailed answers once documents are uploaded."""),
+                ("system", """You are Sahakari Bot, an expert AI assistant for:
+- Cybersecurity compliance
+- Insider risk management
+- Cooperative regulation in Nepal
+- Governance and audit
+- Data privacy
+- Network security
+
+You provide accurate, practical guidance using general knowledge in these areas.
+
+If the user wants a cooperative cyber risk evaluation, do this:
+1) Ask the minimum necessary questions to assess risk (size, systems, data types, controls, recent incidents, staff training, backups, access control).
+2) Provide a clear risk rating (Low/Medium/High) ONLY after enough info is provided.
+3) Provide prioritized recommendations.
+
+If the question is outside this scope, respond with:
+\""" + settings.RAG_OUT_OF_DOMAIN_MESSAGE + "\""""),
                 ("human", "{question}")
             ])
             
@@ -354,6 +373,59 @@ You provide friendly, professional assistance. If asked about compliance or regu
                 "citations": [],
                 "sources_count": 0
             }
+
+    def _is_risk_assessment_request(self, user_query: str) -> bool:
+        """Detect if user wants a cooperative cyber risk assessment."""
+        query = user_query.lower()
+        triggers = [
+            "risk assessment", "risk evaluation", "assess risk", "evaluate risk",
+            "risk rating", "risk level", "how vulnerable", "vulnerability",
+            "cyber risk", "security risk", "risk score"
+        ]
+        return any(t in query for t in triggers)
+
+    def _has_risk_details(self, user_query: str) -> bool:
+        """Heuristic: check if user provided enough details to rate risk."""
+        query = user_query.lower()
+        details = [
+            "employees", "staff", "users", "branches", "core banking",
+            "server", "cloud", "on-prem", "on premise", "network",
+            "firewall", "antivirus", "edr", "mfa", "2fa",
+            "backup", "disaster recovery", "incident", "breach",
+            "training", "policy", "access control", "privilege",
+            "data types", "pii", "personal data", "financial data"
+        ]
+        return any(d in query for d in details)
+
+    def _risk_assessment_prompt(self) -> Dict:
+        """Return a structured questionnaire for cooperative risk assessment."""
+        questions = [
+            "How many employees and branches does your cooperative have?",
+            "What core systems do you use (core banking, accounting, mobile/online services)?",
+            "Where is your data hosted (on‑premise, cloud, hybrid)?",
+            "Do you use MFA/2FA for staff access and admin accounts?",
+            "Do you have regular backups and a disaster recovery plan?",
+            "Have you had any security incidents or data breaches in the last 12 months?",
+            "Do staff receive cybersecurity awareness training? How often?",
+            "Do you have documented policies (access control, incident response, data privacy)?",
+            "What type of sensitive data do you store (PII, financial records, member data)?"
+        ]
+        formatted = "To evaluate your cooperative’s cybersecurity risk, please answer:\n\n"
+        formatted += "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions)])
+        formatted += "\n\nOnce you answer, I will rate risk (Low/Medium/High) and provide prioritized recommendations."
+        return {"answer": formatted, "citations": [], "sources_count": 0}
+
+    def _is_in_domain(self, user_query: str) -> bool:
+        """Check if query is within the project's domain."""
+        query = user_query.lower().strip()
+        keywords = getattr(settings, "RAG_DOMAIN_KEYWORDS", [])
+        return any(keyword in query for keyword in keywords)
+
+    def _is_greeting(self, user_query: str) -> bool:
+        """Allow basic greetings to get a friendly response."""
+        query = user_query.lower().strip()
+        greetings = getattr(settings, "RAG_GREETING_KEYWORDS", [])
+        return any(greet in query for greet in greetings)
 
 
 rag_service = RAGService()
