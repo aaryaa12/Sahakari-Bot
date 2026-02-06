@@ -206,17 +206,17 @@ const Home = ({ initialAuthMode = null }) => {
                 </div>
                 <div className="space-y-4">
                   <div className="text-3xl font-semibold tracking-tight">
-                    Policy Intelligence
+                    Compliance Workspace
                   </div>
                   <p className="text-sm text-slate-400">
-                    Consolidate regulatory obligations, audit actions, and
-                    security requirements into a single command center.
+                    Centralize your policies, regulations, and audit evidence
+                    into a secure, searchable assistant built for governance.
                   </p>
                   <div className="grid gap-3">
                     {[
-                      "Incident response timelines",
-                      "Vendor risk due diligence",
-                      "Zero-trust access controls",
+                      "Incident response and breach reporting",
+                      "Vendor risk and due diligence checks",
+                      "Data retention and access controls",
                     ].map((item) => (
                       <div
                         key={item}

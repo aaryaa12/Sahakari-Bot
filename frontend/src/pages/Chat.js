@@ -233,12 +233,11 @@ const Chat = () => {
           });
 
           if (response.data.completed) {
-            const reportUrl = assessmentAPI.report(response.data.assessment_id);
             const botMessage = {
               id: Date.now() + 1,
               type: "bot",
               content: buildAssessmentSummary(response.data),
-              link: reportUrl,
+              downloadAction: () => assessmentAPI.downloadReport(response.data.assessment_id),
               linkLabel: "Download PDF report"
             };
             setMessages((prev) => [...prev, botMessage]);
@@ -543,6 +542,34 @@ const Chat = () => {
                             >
                               {msg.linkLabel || "Download report"}
                             </a>
+                          )}
+                          {msg.downloadAction && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await msg.downloadAction();
+                                } catch (error) {
+                                  console.error("Download error:", error);
+                                  alert("Failed to download report. Please try again.");
+                                }
+                              }}
+                              className="inline-flex items-center gap-2 mt-3 text-sm text-blue-400 hover:text-blue-300 transition"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                              {msg.linkLabel || "Download report"}
+                            </button>
                           )}
                         </div>
                       </div>

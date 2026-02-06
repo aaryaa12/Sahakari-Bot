@@ -5,6 +5,10 @@ from typing import List, Dict, Optional, Any, AsyncGenerator
 from app.core.database import get_collection
 from app.services.embeddings import embedding_service
 from app.services.documents import document_service
+from app.services.intent_router import detect_intent
+from app.services.hybrid_retrieval import hybrid_retrieve
+from app.services.constrained_retrieval import constrained_retrieve
+from app.services.numeric_validator import sanitize_penalty_response, validate_amounts
 from app.core.config import settings
 import uuid
 import logging
@@ -24,7 +28,14 @@ def _generate_cache_key(query: str, history: Optional[List[Dict[str, Any]]] = No
     """Generate cache key from query and history."""
     history_str = ""
     if history:
-        history_str = str([f"{m.get('role', '')}:{m.get('content', '')[:50]}" for m in history[-4:]])
+        # Handle both objects and dictionaries
+        def get_msg_parts(m):
+            if hasattr(m, 'role') and hasattr(m, 'content'):
+                return f"{m.role}:{str(m.content)[:50]}"
+            elif isinstance(m, dict):
+                return f"{m.get('role', '')}:{m.get('content', '')[:50]}"
+            return ""
+        history_str = str([get_msg_parts(m) for m in history[-4:]])
     cache_input = f"{query.lower().strip()}|{history_str}"
     return hashlib.md5(cache_input.encode()).hexdigest()
 
@@ -159,53 +170,188 @@ class RAGService:
         return self.llm
     
     def ingest_document(self, file_path: str, file_hash: Optional[str] = None) -> Dict:
-        """Process and ingest document into vector database."""
+        """Process and ingest document into vector database with section-aware metadata."""
+        logger.info(f"🔍 START ingest_document: {file_path}")
+        
         # Extract text from document
+        logger.info(f"   Extracting document chunks...")
         document_chunks = document_service.process_document(file_path)
+        logger.info(f"✅ Got {len(document_chunks)} chunks from document service")
+        
+        # Import legal classifier
+        from app.services.legal_classifier import legal_classifier
         
         all_texts = []
         all_metadatas = []
         all_ids = []
         
-        for chunk in document_chunks:
-            # Split into smaller chunks
-            texts = self.text_splitter.split_text(chunk["text"])
+        for idx, chunk in enumerate(document_chunks):
+            # Check if this is a section-aware chunk (has metadata)
+            has_section_metadata = "metadata" in chunk and chunk["metadata"].get("has_section_structure", False)
             
-            for i, text in enumerate(texts):
-                if text.strip():  # Only add non-empty chunks
-                    chunk_id = str(uuid.uuid4())
-                    all_texts.append(text)
-                    metadata = {
-                        "source": chunk["source"],
-                        "page": str(chunk["page"]),
-                        "type": chunk["type"],
-                        "chunk_index": str(i)
-                    }
-                    # Add file hash if provided (for change detection)
-                    if file_hash:
-                        metadata["file_hash"] = file_hash
-                    all_metadatas.append(metadata)
-                    all_ids.append(chunk_id)
+            if has_section_metadata:
+                # Section chunks from legal parser - already sub-chunked
+                chunk_id = str(uuid.uuid4())
+                all_texts.append(chunk["text"])
+                
+                # LEGAL CLASSIFICATION (new step)
+                if (idx + 1) % 10 == 0:
+                    logger.info(f"   Classifying chunk {idx+1}/{len(document_chunks)}...")
+                
+                try:
+                    classification = legal_classifier.classify_section(
+                        section_text=chunk["text"],
+                        section_number=chunk["metadata"]["section_number"],
+                        section_title=chunk["metadata"].get("section_title", ""),
+                        act_name=chunk["metadata"]["act_name"]
+                    )
+                    legal_type = classification["legal_type"]
+                    legal_scope = classification["legal_scope"]
+                except Exception as e:
+                    logger.warning(f"Classification failed for Section {chunk['metadata']['section_number']}: {e}")
+                    legal_type = "procedure"  # Default fallback
+                    legal_scope = "general"
+                
+                # Preserve all metadata from legal parser + add classification
+                metadata = {
+                    "source": chunk["source"],
+                    "page": str(chunk["page"]),
+                    "type": chunk["type"],
+                    "act_name": chunk["metadata"]["act_name"],
+                    "section_number": chunk["metadata"]["section_number"],
+                    "section_title": chunk["metadata"].get("section_title", ""),
+                    "page_range": chunk["metadata"].get("page_range", ""),
+                    "chunk_index": chunk["metadata"].get("chunk_index", 0),
+                    "has_section_structure": True,
+                    # NEW: Legal classification metadata
+                    "legal_type": legal_type,
+                    "legal_scope": legal_scope
+                }
+                
+                # Include chapter if present
+                if chunk["metadata"].get("chapter_number"):
+                    metadata["chapter_number"] = chunk["metadata"]["chapter_number"]
+                
+                if file_hash:
+                    metadata["file_hash"] = file_hash
+                
+                all_metadatas.append(metadata)
+                all_ids.append(chunk_id)
+            else:
+                # Legacy: split into smaller chunks for non-legal documents
+                texts = self.text_splitter.split_text(chunk["text"])
+                
+                for i, text in enumerate(texts):
+                    if text.strip():
+                        chunk_id = str(uuid.uuid4())
+                        all_texts.append(text)
+                        metadata = {
+                            "source": chunk["source"],
+                            "page": str(chunk["page"]),
+                            "type": chunk["type"],
+                            "chunk_index": str(i),
+                            "has_section_structure": False
+                        }
+                        if file_hash:
+                            metadata["file_hash"] = file_hash
+                        all_metadatas.append(metadata)
+                        all_ids.append(chunk_id)
         
         if not all_texts:
             raise ValueError("No text extracted from document")
         
-        # Generate embeddings
-        embeddings = embedding_service.embed_documents(all_texts)
+        logger.info(f"🔍 START embedding generation for {len(all_texts)} chunks")
+        
+        # Generate embeddings in batches to show progress
+        batch_size = 10
+        embeddings = []
+        
+        for i in range(0, len(all_texts), batch_size):
+            batch_end = min(i + batch_size, len(all_texts))
+            batch_texts = all_texts[i:batch_end]
+            
+            logger.info(f"   Embedding batch {i//batch_size + 1}/{(len(all_texts) + batch_size - 1)//batch_size} ({i+1}-{batch_end}/{len(all_texts)})...")
+            batch_embeddings = embedding_service.embed_documents(batch_texts)
+            embeddings.extend(batch_embeddings)
+        
+        logger.info(f"✅ DONE embedding generation: {len(embeddings)} embeddings")
         
         # Add to ChromaDB
+        logger.info(f"🔍 START chroma add ({len(all_texts)} documents)")
         self.collection.add(
             embeddings=embeddings,
             documents=all_texts,
             metadatas=all_metadatas,
             ids=all_ids
         )
+        logger.info(f"✅ DONE chroma add")
+        
+        logger.info(f"✅ DONE ingest_document: {len(all_texts)} chunks ingested")
         
         return {
             "status": "success",
             "chunks_ingested": len(all_texts),
             "source": document_chunks[0]["source"] if document_chunks else "unknown"
         }
+    
+    def _add_legal_header(self, answer: str, citations: list, user_query: str) -> str:
+        """Add Act + Section/Chapter label at the top of legal answers."""
+        if not citations:
+            return answer
+        
+        # Extract section or chapter number from query
+        from app.services.hybrid_retrieval import extract_section_number, extract_chapter_number
+        section_num = extract_section_number(user_query)
+        chapter_num = extract_chapter_number(user_query)
+        
+        # Get act name from first citation
+        act_name = citations[0].get("source", "Legal Document")
+        
+        # Build header
+        header = ""
+        if section_num:
+            header = f"**{act_name} — Section {section_num}**\n\n"
+        elif chapter_num:
+            header = f"**{act_name} — Chapter {chapter_num}**\n\n"
+        else:
+            # For concept questions, just add act name
+            header = f"**Source: {act_name}**\n\n"
+        
+        return header + answer
+    
+    def _identify_target_law(self, user_query: str) -> str:
+        """Identify which specific law the question is about."""
+        query_lower = user_query.lower()
+        
+        # Direct law mentions
+        if 'electronic transaction' in query_lower or 'eta' in query_lower:
+            return "Electronic Transaction Act 2063"
+        if 'cooperative act' in query_lower or 'cooperatives act' in query_lower:
+            return "Cooperatives Act 2074"
+        if 'banking offence' in query_lower or 'bopa' in query_lower:
+            return "Banking Offences and Punishment Act"
+        
+        # Topic-based law routing
+        legal_topics = {
+            "Cooperatives Act 2074": [
+                "register cooperative", "cooperative formation", "cooperative board",
+                "cooperative member", "cooperative audit", "cooperative merger",
+                "cooperative dissolution", "unauthorized loan", "cooperative fund",
+                "cooperative management", "cooperative share", "cooperative election"
+            ],
+            "Electronic Transaction Act 2063": [
+                "digital signature", "electronic document", "electronic record",
+                "cyber crime", "hacking", "data breach", "unauthorized access",
+                "electronic authentication", "certification authority"
+            ]
+        }
+        
+        for law, keywords in legal_topics.items():
+            if any(keyword in query_lower for keyword in keywords):
+                return law
+        
+        return ""  # No specific law identified
+    
     
     def query(self, user_query: str, top_k: Optional[int] = None, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """Query RAG system and generate response."""
@@ -216,87 +362,214 @@ class RAGService:
             logger.debug(f"Cache hit for query: {user_query[:50]}...")
             return cached
         
+        # STEP 1: Classify intent BEFORE retrieval (simple keyword-based)
+        intent = detect_intent(user_query)
+        logger.info(f"Intent detected: {intent} for query: {user_query[:50]}...")
+        
+        # ============================================================================
+        # ROUTING LAYER: Call appropriate module based on intent
+        # ============================================================================
+        
+        # Route to Security Advisory Module (no RAG, no legal pipeline)
+        if intent == 'SECURITY':
+            from app.services.security_advisor import security_advisor
+            result = security_advisor.get_security_advice(user_query, history)
+            _set_cached_response(cache_key, result)
+            return result
+        
+        # ============================================================================
+        # LEGAL MODE PIPELINE STARTS HERE (unchanged - do not modify below)
+        # ============================================================================
+        
+        # STEP 2: Route based on intent
+        if intent == 'GENERAL':  # General conversation
+            result = self._general_chat_response(user_query, history)
+            _set_cached_response(cache_key, result)
+            return result
+        
+        if intent == 'COOP':  # Cooperative operational guidance
+            result = self._advisory_response(user_query, history, intent)
+            _set_cached_response(cache_key, result)
+            return result
+        
+        # STEP 3: For legal questions (intent LEGAL), use constrained retrieval
         # Check if collection has documents
         collection_count = self.collection.count()
         
-        # If no documents, use basic chat mode (Ollama only)
         if collection_count == 0:
-            return self._basic_chat(user_query)
+            result = {"answer": "I need the relevant legal documents to answer this accurately. Please add the law/regulation to the document library.", "citations": [], "sources_count": 0}
+            _set_cached_response(cache_key, result)
+            return result
         
-        # Get configuration values
-        default_top_k = getattr(settings, 'RAG_TOP_K', 5)
-        similarity_threshold = getattr(settings, 'RAG_SIMILARITY_THRESHOLD', 0.3)
-        max_context_length = getattr(settings, 'RAG_MAX_CONTEXT_LENGTH', 4000)
-        
+        # STEP 4: Constrained retrieval (structure-first filtering + semantic search)
+        default_top_k = getattr(settings, 'RAG_TOP_K', 4)  # Reduced to 4 for more focused results
         top_k = top_k or default_top_k
         
-        # Generate query embedding
-        query_embedding = embedding_service.embed_text(user_query)
+        # Use new constrained retrieval system
+        retrieval_result = constrained_retrieve(user_query, top_k=top_k)
+        contexts = retrieval_result["contexts"]
+        citations = retrieval_result["citations"]
+        retrieval_method = retrieval_result["retrieval_method"]
+        filters_applied = retrieval_result.get("filters_applied", {})
         
-        # Search in ChromaDB - retrieve more than needed for filtering
-        search_k = min(top_k * 2, collection_count)  # Get 2x for filtering
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=search_k
-        )
+        logger.info(f"Retrieved {len(contexts)} contexts using {retrieval_method}")
+        logger.info(f"Filters applied: {filters_applied}")
         
-        # Extract relevant context with similarity filtering
-        contexts = []
-        citations = []
-        total_context_length = 0
-        max_similarity = 0.0
+        # Check query type FIRST (chapter or section)
+        from app.services.hybrid_retrieval import extract_section_number, extract_chapter_number
+        section_num = extract_section_number(user_query)
+        chapter_num = extract_chapter_number(user_query)
         
-        if results["documents"] and len(results["documents"][0]) > 0:
-            for i, doc in enumerate(results["documents"][0]):
-                metadata = results["metadatas"][0][i]
-                distance = results["distances"][0][i] if "distances" in results else None
+        # Handle chapter query (returns all sections in chapter)
+        if chapter_num and not section_num:
+            if not contexts:
+                from app.services.hybrid_retrieval import identify_target_act
+                target_act = identify_target_act(user_query)
+                act_display = target_act if target_act else "the provided legal documents"
                 
-                # Calculate similarity score (1 - distance, where distance is typically 0-2)
-                # For cosine similarity, distance of 0 = perfect match, 2 = opposite
-                if distance is not None:
-                    # Normalize distance to similarity score (0-1)
-                    # Cosine distance ranges from 0 to 2, so similarity = 1 - (distance/2)
-                    similarity_score = 1 - (distance / 2.0)
-                    max_similarity = max(max_similarity, similarity_score)
-                    
-                    # Filter by similarity threshold
-                    if similarity_score < similarity_threshold:
-                        logger.debug(f"Skipping low-relevance chunk (similarity: {similarity_score:.3f} < {similarity_threshold})")
-                        continue
-                else:
-                    similarity_score = None
+                result = {
+                    "answer": f"I cannot find Chapter {chapter_num} in {act_display}.",
+                    "citations": [],
+                    "sources_count": 0
+                }
+                _set_cached_response(cache_key, result)
+                return result
+            
+            # Generate chapter summary from all retrieved sections
+            law_name = citations[0]["source"] if citations else "Legal Documents"
+            
+            chapter_summary_prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are a legal compliance assistant for Sahakari Bot. Summarize the chapter using ONLY the provided text.
+
+BEHAVIORAL CONTRACT:
+- Use ONLY the retrieved text
+- Never add external knowledge
+- Never say "consult a lawyer" or disclaimers
+- Be structured and deterministic
+
+OUTPUT FORMAT (for chapter summaries):
+
+**Chapter Overview:**
+[2-3 sentences on what this chapter addresses]
+
+**Key Sections:**
+- Section X: [Brief description]
+- Section Y: [Brief description]
+
+**Main Legal Requirements:**
+[Bullet list of key obligations and provisions from the chapter]
+
+**What is NOT specified:**
+[What the chapter does not address]
+
+**Citation:**
+{law_name}, Chapter {chapter_num}
+
+Use ONLY the provided text. Be precise."""),
+                ("human", """Chapter {chapter_num} content from {law_name}:
+
+{context}
+
+Question: {question}
+
+Provide a structured chapter summary.""")
+            ])
+            
+            context_parts = []
+            for i, ctx in enumerate(contexts):
+                source_name = citations[i]['source'] if i < len(citations) else "Unknown"
+                section_info = citations[i].get('page', 'Unknown')
+                context_parts.append(f"[{section_info}]:\n{ctx}")
+            context_text = "\n\n".join(context_parts)
+            
+            try:
+                messages = chapter_summary_prompt.format_messages(
+                    context=context_text,
+                    question=user_query,
+                    law_name=law_name,
+                    chapter_num=chapter_num
+                )
                 
-                # Check context length limit
-                doc_length = len(doc)
-                if total_context_length + doc_length > max_context_length and contexts:
-                    logger.debug(f"Reached context length limit ({max_context_length}), stopping retrieval")
+                llm = self._get_llm()
+                response = llm.invoke(messages)
+                answer = response.content if hasattr(response, 'content') else str(response)
+                
+                result = {
+                    "answer": answer,
+                    "citations": citations,
+                    "sources_count": len(citations)
+                }
+                _set_cached_response(cache_key, result)
+                return result
+            except Exception as e:
+                logger.error(f"Error generating chapter summary: {e}")
+                answer = f"Error generating chapter summary: {str(e)}"
+                result = {
+                    "answer": answer,
+                    "citations": citations,
+                    "sources_count": len(citations)
+                }
+                _set_cached_response(cache_key, result)
+                return result
+        
+        # Handle section query
+        if section_num:
+            # This is a section query - must be deterministic
+            if not contexts:
+                # No results for section query - deterministic refusal
+                from app.services.hybrid_retrieval import identify_target_act
+                target_act = identify_target_act(user_query)
+                act_display = target_act if target_act else "the provided legal documents"
+                
+                result = {
+                    "answer": f"I cannot find Section {section_num} in {act_display}.",
+                    "citations": [],
+                    "sources_count": 0
+                }
+                _set_cached_response(cache_key, result)
+                return result
+            
+            # Section query with results - verify it's the right section
+            correct_section_found = False
+            for citation in citations:
+                if citation.get("page") == f"Section {section_num}":
+                    correct_section_found = True
                     break
+            
+            if not correct_section_found:
+                # Retrieved something but not the requested section
+                from app.services.hybrid_retrieval import identify_target_act
+                target_act = identify_target_act(user_query)
+                act_display = target_act if target_act else "the provided legal documents"
                 
-                contexts.append(doc)
-                total_context_length += doc_length
-                
-                citations.append({
-                    "source": metadata.get("source", "Unknown"),
-                    "page": metadata.get("page", "N/A"),
-                    "excerpt": doc[:200] + "..." if len(doc) > 200 else doc,
-                    "relevance_score": round(similarity_score, 3) if similarity_score is not None else None
-                })
-                
-                # Stop if we have enough high-quality contexts
-                if len(contexts) >= top_k:
-                    break
-        
-        if not contexts:
+                result = {
+                    "answer": f"I cannot find Section {section_num} in {act_display}.",
+                    "citations": [],
+                    "sources_count": 0
+                }
+                _set_cached_response(cache_key, result)
+                return result
+        elif not contexts:
+            # FALLBACK RULE: No matching sections found
+            # Check if this was a legal question that failed retrieval
+            if intent == 'LEGAL':
+                # For legal questions, give specific message about document coverage
+                result = {
+                    "answer": "The provided legal documents do not contain a provision addressing this specific matter.",
+                    "citations": [],
+                    "sources_count": 0
+                }
+                _set_cached_response(cache_key, result)
+                return result
+            
+            # Non-legal queries with no contexts
             history_text = self._history_text(history)
             combined_text = f"{history_text}\n{user_query}".strip()
-            # If no relevant context, allow in-domain general response
+            
             if self._is_in_domain(combined_text) or self._is_greeting(user_query):
                 if self._is_legal_penalty_question(combined_text):
                     result = {
-                        "answer": (
-                            "I could not find legal penalty details in the current documents. "
-                            "Please add the relevant act/regulation PDFs, then ask again."
-                        ),
+                        "answer": "The provided legal documents do not contain a provision addressing this specific matter.",
                         "citations": [],
                         "sources_count": 0
                     }
@@ -309,6 +582,7 @@ class RAGService:
                 result = self._basic_chat(user_query, history=history)
                 _set_cached_response(cache_key, result)
                 return result
+            
             result = {
                 "answer": settings.RAG_OUT_OF_DOMAIN_MESSAGE,
                 "citations": [],
@@ -319,6 +593,8 @@ class RAGService:
         
         # If legal penalty question but context is weak, avoid unreliable answers
         if self._is_legal_penalty_question(user_query):
+            # Calculate max similarity from citations
+            max_similarity = max([c.get("relevance_score", 0) for c in citations]) if citations else 0
             legal_min_similarity = 0.4  # Reduced from 0.6 to allow more legal content
             if max_similarity < legal_min_similarity:
                 result = {
@@ -340,46 +616,87 @@ class RAGService:
             context_parts.append(f"[Context {i+1} from {source_name}]:\n{ctx}")
         context_text = "\n\n".join(context_parts)
         
+        # Identify law name from citations for better prompting
+        law_name = citations[0]["source"] if citations else "Legal Documents"
+        
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert AI assistant for cybersecurity compliance, cooperative regulation in Nepal, and legal frameworks (ETA, Cooperative Act, ISO 27001, NIST).
+            ("system", """You analyze legal documents for cooperatives. Answer using the text provided below.
 
-RESPONSE STYLE:
-- Be direct, specific, and authoritative
-- Use structured formatting (bullet points, sections) for clarity
-- Cite specific laws, sections, penalties, and amounts when available
-- Provide actionable, concrete information
+FORMAT (include all 5 sections):
 
-CRITICAL RULES:
-1. LEGAL QUESTIONS: Extract and cite exact sections, penalties, fines, imprisonment terms from documents
-2. TECHNICAL QUESTIONS: Provide specific controls, frameworks, and implementation steps
-3. If documents contain specific details (amounts, timeframes, sections), ALWAYS include them
-4. If no specific details exist, state clearly what is NOT in the documents
-5. Never give generic answers when specific details are available in context
-6. Structure complex answers with clear headings and bullet points"""),
-            ("human", """Context Documents:
+**1) Legal meaning (plain language)**
+[2-4 sentences explaining the provision]
+
+**2) Legal effect / obligations**
+- [Bullet list of obligations]
+
+**3) Practical implications for a cooperative (Kathmandu Valley context)**
+- [3-6 implementation steps]
+
+**4) What the Act does NOT specify**
+- [List what is not defined]
+
+**5) Evidence (from provided documents)**
+Quote: "[short quote]"
+Source: {law_name}, Section [number from text]
+
+EXAMPLE:
+
+**1) Legal meaning (plain language)**
+This requires cooperatives to maintain financial records and conduct annual audits.
+
+**2) Legal effect / obligations**
+- MUST maintain complete financial records
+- MUST conduct annual audit by licensed auditor
+
+**3) Practical implications for a cooperative (Kathmandu Valley context)**
+- Appoint auditor before fiscal year end
+- Maintain accounting ledgers
+- Submit audit report by deadline
+
+**4) What the Act does NOT specify**
+- Specific record format
+- Late submission penalties
+
+**5) Evidence (from provided documents)**
+Quote: "Every cooperative shall maintain proper books and conduct annual audit"
+Source: Cooperatives Act 2074, Section 45
+
+Answer based only on the text."""),
+            ("human", """Legal text:
+
 {context}
 
-User Question: {question}
+Question: {question}
 
-Conversation History:
-{history}
-
-Provide a specific, well-structured answer. If the context contains laws, penalties, or specific details, include them. Format your response clearly.""")
+Answer in 5-section format.""")
         ])
         
         # Generate response using Ollama
-        # ChatOllama works with ChatPromptTemplate directly
         try:
             messages = prompt_template.format_messages(
                 context=context_text,
                 question=user_query,
-                history=self._history_text(history)
+                history=self._history_text(history),
+                law_name=law_name
             )
             
             llm = self._get_llm()  # Lazy initialization
             response = llm.invoke(messages)
-            # ChatOllama returns AIMessage object with content attribute
             answer = response.content if hasattr(response, 'content') else str(response)
+            
+            # Add legal header (Act + Section/Chapter label) for legal answers
+            if intent == 'LEGAL' and citations:
+                answer = self._add_legal_header(answer, citations, user_query)
+            
+            # Apply numeric sanity check for penalty responses
+            if any(keyword in user_query.lower() for keyword in ["penalty", "fine", "punishment", "imprisonment"]):
+                validation = validate_amounts(answer)
+                if not validation["valid"]:
+                    logger.warning(f"Numeric mismatch detected: {validation['reason']}")
+                    answer = sanitize_penalty_response(answer)
+                    logger.info("Applied numeric sanitization to response")
+            
         except ConnectionError as e:
             logger.error(f"Ollama connection error: {e}")
             answer = f"❌ Cannot connect to Ollama. Please make sure Ollama is running:\n\n1. Open a terminal and run: ollama serve\n2. Keep that terminal open\n3. Try your question again"
@@ -402,63 +719,98 @@ Provide a specific, well-structured answer. If the context contains laws, penalt
     
     async def query_stream(self, user_query: str, top_k: Optional[int] = None, history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict, None]:
         """Stream query response in chunks for better UX."""
+        # Check cache first
+        cache_key = _generate_cache_key(user_query, history)
+        cached = _get_cached_response(cache_key)
+        if cached:
+            logger.debug(f"Cache hit (stream mode) for query: {user_query[:50]}...")
+            yield {"type": "content", "content": cached["answer"]}
+            yield {"type": "done", "citations": cached["citations"], "sources_count": cached["sources_count"]}
+            return
+        
+        # Intent routing
+        intent = detect_intent(user_query)
+        logger.info(f"Intent detected (stream): {intent}")
+        
+        # ============================================================================
+        # ROUTING LAYER: Call appropriate module based on intent
+        # ============================================================================
+        
+        # Route to Security Advisory Module (no RAG, no legal pipeline)
+        if intent == 'SECURITY':
+            from app.services.security_advisor import security_advisor
+            result = security_advisor.get_security_advice(user_query, history)
+            yield {"type": "content", "content": result["answer"]}
+            yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
+            return
+        
+        # ============================================================================
+        # LEGAL MODE PIPELINE STARTS HERE (unchanged - do not modify below)
+        # ============================================================================
+        
+        if intent == 'GENERAL':
+            result = self._general_chat_response(user_query, history)
+            yield {"type": "content", "content": result["answer"]}
+            yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
+            return
+        
+        if intent == 'COOP':
+            result = self._advisory_response(user_query, history, intent)
+            yield {"type": "content", "content": result["answer"]}
+            yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
+            return
+        
+        # For LEGAL intent, use constrained retrieval
         collection_count = self.collection.count()
-        
-        # Get configuration values
-        default_top_k = getattr(settings, 'RAG_TOP_K', 5)
-        similarity_threshold = getattr(settings, 'RAG_SIMILARITY_THRESHOLD', 0.3)
-        max_context_length = getattr(settings, 'RAG_MAX_CONTEXT_LENGTH', 4000)
-        top_k = top_k or default_top_k
-        
-        # If no documents, fall back to basic non-streaming
         if collection_count == 0:
             result = self._basic_chat(user_query, history)
             yield {"type": "content", "content": result["answer"]}
             yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
             return
         
-        # Retrieve context (same as non-streaming)
-        query_embedding = embedding_service.embed_text(user_query)
-        search_k = min(top_k * 2, collection_count)
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=search_k
-        )
+        # Constrained retrieval (streaming)
+        default_top_k = getattr(settings, 'RAG_TOP_K', 4)
+        top_k = top_k or default_top_k
         
-        contexts = []
-        citations = []
-        total_context_length = 0
+        retrieval_result = constrained_retrieve(user_query, top_k=top_k)
+        contexts = retrieval_result["contexts"]
+        citations = retrieval_result["citations"]
         
-        if results["documents"] and len(results["documents"][0]) > 0:
-            for i, doc in enumerate(results["documents"][0]):
-                metadata = results["metadatas"][0][i]
-                distance = results["distances"][0][i] if "distances" in results else None
+        # Check if this is a section query FIRST
+        from app.services.section_splitter import extract_section_number_from_query
+        section_num = extract_section_number_from_query(user_query)
+        
+        if section_num:
+            # This is a section query - must be deterministic
+            if not contexts:
+                # No results - deterministic refusal
+                from app.services.hybrid_retrieval import identify_target_act
+                target_act = identify_target_act(user_query)
+                act_display = target_act if target_act else "the provided legal documents"
                 
-                if distance is not None:
-                    similarity_score = 1 - (distance / 2.0)
-                    if similarity_score < similarity_threshold:
-                        continue
-                else:
-                    similarity_score = None
-                
-                doc_length = len(doc)
-                if total_context_length + doc_length > max_context_length and contexts:
+                answer = f"I cannot find Section {section_num} in {act_display}."
+                yield {"type": "content", "content": answer}
+                yield {"type": "done", "citations": [], "sources_count": 0}
+                return
+            
+            # Verify it's the right section
+            correct_section_found = False
+            for citation in citations:
+                if citation.get("page") == f"Section {section_num}":
+                    correct_section_found = True
                     break
+            
+            if not correct_section_found:
+                from app.services.hybrid_retrieval import identify_target_act
+                target_act = identify_target_act(user_query)
+                act_display = target_act if target_act else "the provided legal documents"
                 
-                contexts.append(doc)
-                total_context_length += doc_length
-                citations.append({
-                    "source": metadata.get("source", "Unknown"),
-                    "page": metadata.get("page", "N/A"),
-                    "excerpt": doc[:200] + "..." if len(doc) > 200 else doc,
-                    "relevance_score": round(similarity_score, 3) if similarity_score is not None else None
-                })
-                
-                if len(contexts) >= top_k:
-                    break
-        
-        # If no context, fall back
-        if not contexts:
+                answer = f"I cannot find Section {section_num} in {act_display}."
+                yield {"type": "content", "content": answer}
+                yield {"type": "done", "citations": [], "sources_count": 0}
+                return
+        elif not contexts:
+            # Non-section query with no contexts - fall back
             result = self._basic_chat(user_query, history)
             yield {"type": "content", "content": result["answer"]}
             yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
@@ -471,48 +823,93 @@ Provide a specific, well-structured answer. If the context contains laws, penalt
             context_parts.append(f"[Context {i+1} from {source_name}]:\n{ctx}")
         context_text = "\n\n".join(context_parts)
         
+        law_name = citations[0]["source"] if citations else "Legal Documents"
+        
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert AI assistant for cybersecurity compliance, cooperative regulation in Nepal, and legal frameworks (ETA, Cooperative Act, ISO 27001, NIST).
+            ("system", """You analyze legal documents for cooperatives. Answer using the text provided below.
 
-RESPONSE STYLE:
-- Be direct, specific, and authoritative
-- Use structured formatting (bullet points, sections) for clarity
-- Cite specific laws, sections, penalties, and amounts when available
-- Provide actionable, concrete information
+FORMAT (include all 5 sections):
 
-CRITICAL RULES:
-1. LEGAL QUESTIONS: Extract and cite exact sections, penalties, fines, imprisonment terms from documents
-2. TECHNICAL QUESTIONS: Provide specific controls, frameworks, and implementation steps
-3. If documents contain specific details (amounts, timeframes, sections), ALWAYS include them
-4. If no specific details exist, state clearly what is NOT in the documents
-5. Never give generic answers when specific details are available in context
-6. Structure complex answers with clear headings and bullet points"""),
-            ("human", """Context Documents:
+**1) Legal meaning (plain language)**
+[2-4 sentences explaining the provision]
+
+**2) Legal effect / obligations**
+- [Bullet list of obligations]
+
+**3) Practical implications for a cooperative (Kathmandu Valley context)**
+- [3-6 implementation steps]
+
+**4) What the Act does NOT specify**
+- [List what is not defined]
+
+**5) Evidence (from provided documents)**
+Quote: "[short quote]"
+Source: {law_name}, Section [number from text]
+
+EXAMPLE:
+
+**1) Legal meaning (plain language)**
+This requires cooperatives to maintain financial records and conduct annual audits.
+
+**2) Legal effect / obligations**
+- MUST maintain complete financial records
+- MUST conduct annual audit by licensed auditor
+
+**3) Practical implications for a cooperative (Kathmandu Valley context)**
+- Appoint auditor before fiscal year end
+- Maintain accounting ledgers
+- Submit audit report by deadline
+
+**4) What the Act does NOT specify**
+- Specific record format
+- Late submission penalties
+
+**5) Evidence (from provided documents)**
+Quote: "Every cooperative shall maintain proper books and conduct annual audit"
+Source: Cooperatives Act 2074, Section 45
+
+Answer based only on the text."""),
+            ("human", """Legal text:
+
 {context}
 
-User Question: {question}
+Question: {question}
 
-Conversation History:
-{history}
-
-Provide a specific, well-structured answer. If the context contains laws, penalties, or specific details, include them. Format your response clearly.""")
+Answer in 5-section format.""")
         ])
         
         try:
             messages = prompt_template.format_messages(
                 context=context_text,
                 question=user_query,
-                history=self._history_text(history)
+                history=self._history_text(history),
+                law_name=law_name
             )
             
             llm = self._get_llm()
+            
+            # Collect full response for numeric validation
+            full_response = ""
+            
+            # Add legal header first (for streaming)
+            if intent == 'LEGAL' and citations:
+                header = self._add_legal_header("", citations, user_query)
+                if header:
+                    yield {"type": "content", "content": header}
             
             # Stream response chunks
             for chunk in llm.stream(messages):
                 content = chunk.content if hasattr(chunk, 'content') else str(chunk)
                 if content:
+                    full_response += content
                     yield {"type": "content", "content": content}
                     await asyncio.sleep(0)  # Allow other tasks to run
+            
+            # Apply numeric sanity check after streaming completes
+            if any(keyword in user_query.lower() for keyword in ["penalty", "fine", "punishment", "imprisonment"]):
+                validation = validate_amounts(full_response)
+                if not validation["valid"]:
+                    logger.warning(f"Numeric mismatch detected in streaming response")
             
             # Send citations at the end
             yield {"type": "done", "citations": citations, "sources_count": len(citations)}
@@ -521,6 +918,121 @@ Provide a specific, well-structured answer. If the context contains laws, penalt
             logger.error(f"Streaming error: {e}")
             yield {"type": "error", "content": f"Error: {str(e)}"}
     
+    def _general_chat_response(self, user_query: str, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
+        """Handle general conversation (greetings, unrelated topics)."""
+        try:
+            llm = self._get_llm()
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", """GENERAL MODE - Normal conversational assistant.
+
+BEHAVIORAL CONTRACT:
+1. Respond naturally and friendly to greetings
+2. Answer general questions conversationally
+3. Be helpful and professional
+4. If topic is unrelated to your expertise, gently suggest cybersecurity/compliance topics
+
+RESTRICTIONS:
+- DO NOT refuse to answer greetings or small talk
+- DO NOT cite laws for non-legal questions
+- DO NOT say "I cannot help with that" for greetings
+
+Be a normal, friendly assistant."""),
+                ("human", "{question}")
+            ])
+            messages = prompt.format_messages(question=user_query)
+            response = llm.invoke(messages)
+            answer = response.content if hasattr(response, 'content') else str(response)
+            return {"answer": answer, "citations": [], "sources_count": 0}
+        except Exception as e:
+            logger.error(f"General chat error: {e}")
+            return {"answer": "Hello! I'm here to help with cybersecurity, compliance, and cooperative management questions. How can I assist you today?", "citations": [], "sources_count": 0}
+    
+    def _advisory_response(self, user_query: str, history: Optional[List[Dict[str, Any]]] = None, intent: str = 'SECURITY') -> Dict:
+        """Provide cybersecurity or operational advice without forcing document retrieval."""
+        try:
+            llm = self._get_llm()
+            
+            if intent == 'SECURITY':  # Cybersecurity advice
+                system_msg = """SECURITY MODE - You provide practical cybersecurity and risk management guidance for cooperatives.
+
+YOUR ROLE:
+- Answer ALL security and risk management questions directly and helpfully
+- Provide technical security advice and best practices
+- Address insider threats, access control, data protection, and operational security
+- Recommend specific controls: access control, monitoring, segregation of duties, audit trails
+- Explain HOW to implement protections (step-by-step)
+- Give practical recommendations for cooperative environments
+- Reference technical standards (ISO 27001, NIST CSF, CIS Controls) when helpful
+
+INSIDER RISK PROTECTION includes:
+- Access control and least privilege
+- Segregation of duties (no single person controls entire transaction)
+- Regular audits and monitoring
+- Background checks for key positions
+- Dual authorization for critical transactions
+- Activity logging and review
+- Policy enforcement and training
+
+IMPORTANT:
+- "Insider risk" is a LEGITIMATE business concern, not illegal activity
+- Protecting against insider threats is STANDARD governance practice
+- Answer these questions with practical controls and procedures
+- DO NOT refuse questions about risk management or security
+- DO NOT cite laws unless specifically asked
+- Be direct, helpful, and actionable
+
+Provide PRACTICAL guidance. NEVER refuse legitimate security questions."""
+            else:  # Cooperative operational guidance
+                system_msg = """COOPERATIVE OPERATIONAL MODE - You provide management and governance guidance for cooperatives.
+
+YOUR ROLE:
+- Answer ALL cooperative management questions directly and helpfully
+- Provide practical operational advice for running cooperatives
+- Recommend best practices for governance, meetings, member services, audits
+- Explain processes and management procedures
+- Address risk management, internal controls, and operational security
+- Be direct and actionable
+
+GOVERNANCE & RISK MANAGEMENT includes:
+- Board oversight and accountability
+- Internal controls and checks & balances
+- Segregation of duties
+- Financial controls and audit
+- Member communication and transparency
+- Policy development and enforcement
+- Training and capacity building
+
+IMPORTANT:
+- Questions about risk management, controls, and governance are LEGITIMATE
+- These are STANDARD cooperative management topics
+- Answer with best practices from cooperative management principles
+- DO NOT refuse questions about governance, controls, or risk management
+- DO NOT cite laws unless specifically asked
+- Be practical and helpful
+
+Provide PRACTICAL operational guidance. NEVER refuse legitimate management questions."""
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_msg),
+                ("human", """Previous conversation:
+{history}
+
+Question: {question}
+
+Provide clear, actionable guidance.""")
+            ])
+            
+            messages = prompt.format_messages(
+                question=user_query,
+                history=self._history_text(history)
+            )
+            response = llm.invoke(messages)
+            answer = response.content if hasattr(response, 'content') else str(response)
+            return {"answer": answer, "citations": [], "sources_count": 0}
+        except Exception as e:
+            logger.error(f"Advisory response error: {e}")
+            return {"answer": "I can help with cybersecurity and compliance guidance. Please ask a specific question.", "citations": [], "sources_count": 0}
+    
     def _basic_chat(self, user_query: str, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """General chat mode for in-domain queries when no relevant documents are found."""
         try:
@@ -528,29 +1040,27 @@ Provide a specific, well-structured answer. If the context contains laws, penalt
             
             # Create a simple prompt for general chat
             prompt_template = ChatPromptTemplate.from_messages([
-                ("system", """You are Sahakari Bot, an expert AI assistant specializing in cybersecurity compliance, cooperative regulation in Nepal, and risk management.
+                ("system", """You are Sahakari Bot, an expert AI assistant for:
+- Cybersecurity compliance
+- Insider risk management
+- Cooperative regulation in Nepal
+- Governance and audit
+- Data privacy
+- Network security
 
-EXPERTISE AREAS:
-- Nepal legal frameworks (Cooperative Act, ETA, Nepal Rastra Bank regulations)
-- International standards (ISO 27001, NIST CSF)
-- Cybersecurity controls and best practices
-- Insider risk and governance
+You provide accurate, practical guidance using general knowledge in these areas.
 
-RESPONSE GUIDELINES:
-1. Be specific and actionable - provide concrete steps, not generic advice
-2. Structure answers clearly with bullet points and sections
-3. For legal questions: Cite specific acts, sections, and penalties when you know them
-4. For technical questions: Provide specific controls, tools, and implementation guidance
-5. For risk questions: Use clear risk levels (Low/Medium/High/Critical) with justification
+If the user wants a cooperative cyber risk evaluation, do this:
+1) Ask the minimum necessary questions to assess risk (size, systems, data types, controls, recent incidents, staff training, backups, access control).
+2) Provide a clear risk rating (Low/Medium/High) ONLY after enough info is provided.
+3) Provide prioritized recommendations.
 
-If the question is outside cybersecurity/compliance scope, respond with:
+If the question is outside this scope, respond with:
 \""" + settings.RAG_OUT_OF_DOMAIN_MESSAGE + "\""""),
-                ("human", """User Question: {question}
-
-Conversation History:
+                ("human", """Conversation so far:
 {history}
 
-Provide a clear, specific, well-structured answer.""")
+User Question: {question}""")
             ])
             
             messages = prompt_template.format_messages(
@@ -593,12 +1103,19 @@ Provide a clear, specific, well-structured answer.""")
             return ""
         parts = []
         for msg in history[-8:]:
+            # Handle both object types (with attributes) and dictionaries
             if hasattr(msg, "role") and hasattr(msg, "content"):
+                # It's an object with attributes
                 role = msg.role
                 content = msg.content
-            else:
+            elif isinstance(msg, dict):
+                # It's a dictionary
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
+            else:
+                # Unknown type, skip
+                continue
+            
             if not content:
                 continue
             parts.append(f"{role}: {content}")

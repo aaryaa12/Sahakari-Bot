@@ -1,0 +1,46 @@
+# Node modules and cache
+frontend/node_modules/.cache/
+*.pack
+*.pack.old
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Chroma DB
+backend/chroma_db/
+
+# Assessment data (contains user data)
+data/assessments.json
+
+# Environment variables
+.env
+.env.local
+
+# Test results
+eval_results.json

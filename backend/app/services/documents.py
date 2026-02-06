@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Dict
 from app.core.config import settings
+from app.services.section_splitter import split_into_sections
 import csv
 import logging
 
@@ -13,19 +14,101 @@ class DocumentService:
     """Service for processing PDF, Excel, CSV, and TXT documents."""
     
     def extract_text_from_pdf(self, file_path: str) -> List[Dict]:
-        """Extract text from PDF with page numbers."""
+        """Extract text from PDF using robust legal parser."""
         chunks = []
         try:
-            with pdfplumber.open(file_path) as pdf:
-                for page_num, page in enumerate(pdf.pages, start=1):
-                    text = page.extract_text()
-                    if text and text.strip():
-                        chunks.append({
-                            "text": text,
-                            "page": page_num,
-                            "source": Path(file_path).name,
-                            "type": "pdf"
-                        })
+            filename = Path(file_path).name
+            
+            # Check if this is a legal document
+            is_legal = any(keyword in filename.lower() for keyword in 
+                          ['act', 'law', 'regulation', 'cooperative', 'eta', 'transaction'])
+            
+            if is_legal:
+                logger.info(f"🔍 START extract_text for {filename}")
+                
+                # Import legal parser
+                from app.services.legal_parser import legal_parser
+                
+                # Extract text per page using pdfplumber (preserves line breaks)
+                page_texts = []
+                full_text = ""
+                
+                with pdfplumber.open(file_path) as pdf:
+                    total_pages = len(pdf.pages)
+                    logger.info(f"   PDF has {total_pages} pages")
+                    
+                    for i, page in enumerate(pdf.pages, 1):
+                        page_text = page.extract_text()
+                        if page_text:
+                            page_texts.append(page_text)
+                            full_text += page_text + "\n"
+                        
+                        if i % 10 == 0:
+                            logger.info(f"   Extracted {i}/{total_pages} pages...")
+                
+                if not full_text.strip():
+                    raise Exception("No text extracted from PDF")
+                
+                logger.info(f"✅ DONE extract_text: {len(full_text):,} chars, {len(full_text.splitlines()):,} lines, {len(page_texts)} pages")
+                
+                # Parse document into sections
+                logger.info(f"🔍 START section_split for {filename}")
+                sections = legal_parser.parse_document(full_text, filename, page_texts)
+                logger.info(f"✅ DONE section_split: {len(sections)} sections detected")
+                
+                if sections:
+                    logger.info(f"🔍 START chunking {len(sections)} sections")
+                    
+                    # Chunk each section
+                    for idx, section in enumerate(sections, 1):
+                        logger.info(f"   Chunking section {idx}/{len(sections)}: Section {section.section_number} ({len(section.full_text)} chars)...")
+                        
+                        section_chunks = legal_parser.chunk_section(section)
+                        logger.info(f"   Created {len(section_chunks)} chunks for Section {section.section_number}")
+                        
+                        for chunk in section_chunks:
+                            chunks.append({
+                                "text": chunk.text,
+                                "page": chunk.page_range,
+                                "source": filename,
+                                "type": "pdf",
+                                "metadata": {
+                                    "act_name": chunk.act_name,
+                                    "chapter_number": chunk.chapter_number,
+                                    "section_number": chunk.section_number,
+                                    "section_title": chunk.section_title,
+                                    "page_range": chunk.page_range,
+                                    "chunk_index": chunk.chunk_index,
+                                    "total_chunks": chunk.total_chunks,
+                                    "has_section_structure": True
+                                }
+                            })
+                    
+                    logger.info(f"✅ DONE chunking: Created {len(chunks)} total chunks from {len(sections)} sections")
+                else:
+                    # Fallback to page-based
+                    logger.warning(f"No sections detected in {filename}, using page-based fallback")
+                    for page_num, page_text in enumerate(page_texts, start=1):
+                        if page_text.strip():
+                            chunks.append({
+                                "text": page_text,
+                                "page": page_num,
+                                "source": filename,
+                                "type": "pdf"
+                            })
+            else:
+                # Non-legal documents: page-based chunking
+                logger.info(f"Using page-based chunking for {filename}")
+                with pdfplumber.open(file_path) as pdf:
+                    for page_num, page in enumerate(pdf.pages, start=1):
+                        text = page.extract_text()
+                        if text and text.strip():
+                            chunks.append({
+                                "text": text,
+                                "page": page_num,
+                                "source": filename,
+                                "type": "pdf"
+                            })
         except Exception as e:
             raise Exception(f"Error extracting PDF: {str(e)}")
         

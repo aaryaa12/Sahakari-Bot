@@ -108,8 +108,40 @@ export const assessmentAPI = {
   start: () => api.post(`${API_V1}/assessment/start`),
   answer: (data) => api.post(`${API_V1}/assessment/answer`, data),
   cancel: (data) => api.post(`${API_V1}/assessment/cancel`, data),
-  report: (assessmentId) =>
-    `${API_URL}${API_V1}/assessment/report/${assessmentId}`,
+  downloadReport: async (assessmentId) => {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${API_URL}${API_V1}/assessment/report/${assessmentId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download report: ${response.statusText}`);
+    }
+    
+    // Get the filename from Content-Disposition header or use default
+    const contentDisposition = response.headers.get("Content-Disposition");
+    let filename = `assessment-report-${assessmentId}.pdf`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    
+    // Convert response to blob and trigger download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 export default api;
