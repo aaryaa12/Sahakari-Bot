@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -63,3 +63,46 @@ class DocumentInfo(BaseModel):
 class DocumentListResponse(BaseModel):
     documents: List[DocumentInfo]
     total: int
+
+
+# Assessment Schemas
+class AssessmentStartResponse(BaseModel):
+    assessment_id: str
+    question: str
+    question_id: str
+    section_title: str
+    references: List[str]
+    question_index: int
+    total_questions: int
+    instructions: str
+
+
+class AssessmentAnswerRequest(BaseModel):
+    assessment_id: str
+    answer: str
+
+
+class AssessmentAnswerResponse(BaseModel):
+    completed: bool
+    assessment_id: str
+    question: Optional[str] = None
+    question_id: Optional[str] = None
+    section_title: Optional[str] = None
+    references: Optional[List[str]] = None
+    question_index: Optional[int] = None
+    total_questions: Optional[int] = None
+    total_score: Optional[int] = None
+    max_score: Optional[int] = None
+    score_percent: Optional[float] = None
+    risk_level: Optional[str] = None
+    section_scores: Optional[Dict[str, Dict[str, int]]] = None
+    recommendations: Optional[List[Dict[str, Any]]] = None
+
+
+class AssessmentCancelResponse(BaseModel):
+    cancelled: bool
+    assessment_id: str
+
+
+class AssessmentCancelRequest(BaseModel):
+    assessment_id: str

@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     
     # Ollama (Local LLM)
-    OLLAMA_MODEL: Optional[str] = None  # None = auto-detect, or specify: "llama3", "mistral", "llama2", etc.
+    # Recommended models for speed: "llama3.2:1b" (fastest), "phi3:mini" (balanced), "llama3" (accurate but slower)
+    OLLAMA_MODEL: Optional[str] = None  # None = auto-detect, or specify: "llama3.2:1b", "phi3:mini", "llama3", etc.
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     
     # Embeddings (Sentence Transformers)
@@ -27,11 +28,11 @@ class Settings(BaseSettings):
     CHROMA_DIR: str = "./chroma_db"
     COLLECTION_NAME: str = "sahakari_docs"
     
-    # RAG Accuracy Settings
-    RAG_TOP_K: int = 5  # Number of chunks to retrieve
+    # RAG Accuracy Settings (Optimized for speed)
+    RAG_TOP_K: int = 3  # Number of chunks to retrieve (reduced from 5 for speed)
     RAG_SIMILARITY_THRESHOLD: float = 0.3  # Minimum similarity score (0-1, lower = more strict)
     RAG_TEMPERATURE: float = 0.2  # Lower = more factual, less creative (0.0-1.0)
-    RAG_MAX_CONTEXT_LENGTH: int = 4000  # Maximum characters in context to prevent overflow
+    RAG_MAX_CONTEXT_LENGTH: int = 2000  # Maximum characters in context (reduced from 4000 for speed)
     RAG_OUT_OF_DOMAIN_MESSAGE: str = (
         "I can help with cybersecurity compliance, insider risk management, "
         "cooperative regulation in Nepal, governance/audit, data privacy, and network security. "

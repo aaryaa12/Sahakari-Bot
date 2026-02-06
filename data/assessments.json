@@ -1,0 +1,1066 @@
+{
+  "assessments": {
+    "d7e88314-4691-4027-a817-2e5502c769a4": {
+      "id": "d7e88314-4691-4027-a817-2e5502c769a4",
+      "user_id": 1,
+      "created_at": "2026-02-01T10:31:27.075744",
+      "completed_at": null,
+      "status": "in_progress",
+      "current_index": 0,
+      "answers": [],
+      "total_questions": 30,
+      "max_score": 60
+    },
+    "d4f18645-0663-4da5-9599-6bbc591cbb84": {
+      "id": "d4f18645-0663-4da5-9599-6bbc591cbb84",
+      "user_id": 1,
+      "created_at": "2026-02-01T10:31:45.081514",
+      "completed_at": "2026-02-01T10:32:59.834011",
+      "status": "completed",
+      "current_index": 30,
+      "answers": [
+        {
+          "question_id": "A1",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do we have formally approved written policies covering information security, data protection, and acceptable IT usage?",
+          "references": [
+            "ETA \u00a743",
+            "ISO 27001 A.5",
+            "NIST: Govern"
+          ],
+          "recommendation": "Approve and publish formal policies for information security, data protection, and acceptable IT use."
+        },
+        {
+          "question_id": "A2",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Has the board or management formally assigned responsibility for information security and cyber risk?",
+          "references": [
+            "Cooperative Act \u00a774",
+            "ISO 27001 A.5.3",
+            "NIST: Govern"
+          ],
+          "recommendation": "Assign a named owner for information security and cyber risk with defined responsibilities."
+        },
+        {
+          "question_id": "A3",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are members\u2019 personal, financial, and transaction records classified (e.g., confidential, restricted, public)?",
+          "references": [
+            "ETA \u00a745",
+            "ISO 27001 A.5.12",
+            "NIST: Identify"
+          ],
+          "recommendation": "Create a data classification scheme and apply labels to member records."
+        },
+        {
+          "question_id": "A4",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do we maintain documented compliance with Nepal Rastra Bank or regulator guidance where applicable?",
+          "references": [
+            "Cooperative Act 2016",
+            "ISO 27001 A.5",
+            "NIST: Govern"
+          ],
+          "recommendation": "Maintain documented compliance evidence for regulator guidance relevant to the cooperative."
+        },
+        {
+          "question_id": "A5",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are IT and security policies reviewed at least annually?",
+          "references": [
+            "ISO 27001 Clause 9",
+            "NIST: Govern"
+          ],
+          "recommendation": "Set an annual review cycle for IT and security policies and record approvals."
+        },
+        {
+          "question_id": "A6",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do employees sign confidentiality or data protection agreements?",
+          "references": [
+            "ETA \u00a747",
+            "ISO 27001 A.6.6",
+            "NIST: Protect"
+          ],
+          "recommendation": "Ensure all staff sign confidentiality and data protection agreements on onboarding."
+        },
+        {
+          "question_id": "B1",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do we maintain an inventory of IT assets (computers, servers, software, databases)?",
+          "references": [
+            "ISO 27001 A.5.9",
+            "NIST: Identify"
+          ],
+          "recommendation": "Maintain an up-to-date asset inventory covering hardware, software, and data stores."
+        },
+        {
+          "question_id": "B2",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Is sensitive cooperative data encrypted when stored and when transmitted?",
+          "references": [
+            "ETA \u00a752",
+            "ISO 27001 A.8.24",
+            "NIST: Protect"
+          ],
+          "recommendation": "Encrypt sensitive data at rest and in transit using approved cryptography."
+        },
+        {
+          "question_id": "B3",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are backups performed regularly and tested for restoration?",
+          "references": [
+            "ISO 27001 A.8.13",
+            "NIST: Protect"
+          ],
+          "recommendation": "Perform scheduled backups and run periodic restoration tests."
+        },
+        {
+          "question_id": "B4",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Is member data retained only as long as legally required?",
+          "references": [
+            "ETA \u00a728",
+            "ISO 27001 A.5.33",
+            "NIST: Govern"
+          ],
+          "recommendation": "Define retention periods and purge data when it is no longer legally required."
+        },
+        {
+          "question_id": "B5",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do we restrict copying of sensitive data to USB drives or personal devices?",
+          "references": [
+            "ISO 27001 A.8.12",
+            "NIST: Protect"
+          ],
+          "recommendation": "Restrict or monitor removable media and personal device data transfers."
+        },
+        {
+          "question_id": "C1",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do all users have unique user IDs (no shared accounts)?",
+          "references": [
+            "ISO 27001 A.8.2",
+            "NIST: Protect"
+          ],
+          "recommendation": "Eliminate shared accounts and enforce unique user IDs."
+        },
+        {
+          "question_id": "C2",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are strong passwords or multi-factor authentication enforced?",
+          "references": [
+            "ISO 27001 A.8.3",
+            "NIST: Protect"
+          ],
+          "recommendation": "Enforce strong passwords and implement MFA where possible."
+        },
+        {
+          "question_id": "C3",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Is access immediately revoked when staff leave or change roles?",
+          "references": [
+            "ISO 27001 A.6.3",
+            "NIST: Protect"
+          ],
+          "recommendation": "Implement offboarding procedures to remove or adjust access promptly."
+        },
+        {
+          "question_id": "C4",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are system administrator privileges strictly limited and logged?",
+          "references": [
+            "ISO 27001 A.8.15",
+            "NIST: Detect"
+          ],
+          "recommendation": "Limit admin privileges to essential staff and log all privileged activity."
+        },
+        {
+          "question_id": "C5",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are member-facing systems (CBS, mobile apps) protected against unauthorized access?",
+          "references": [
+            "ETA \u00a745",
+            "ISO 27001 A.8",
+            "NIST: Protect"
+          ],
+          "recommendation": "Harden member-facing systems with access controls and security testing."
+        },
+        {
+          "question_id": "D1",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are antivirus, firewall, and endpoint protections deployed and updated?",
+          "references": [
+            "ISO 27001 A.8.7",
+            "NIST: Protect"
+          ],
+          "recommendation": "Deploy endpoint protection and ensure signatures and engines are up to date."
+        },
+        {
+          "question_id": "D2",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are operating systems and applications patched regularly?",
+          "references": [
+            "ISO 27001 A.8.8",
+            "NIST: Protect"
+          ],
+          "recommendation": "Adopt a patch management schedule for OS and application updates."
+        },
+        {
+          "question_id": "D3",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are logs collected and reviewed for suspicious activity?",
+          "references": [
+            "ISO 27001 A.8.15",
+            "NIST: Detect"
+          ],
+          "recommendation": "Centralize logs and review them for suspicious activity on a routine schedule."
+        },
+        {
+          "question_id": "D4",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Is internet access filtered to prevent phishing and malware?",
+          "references": [
+            "ISO 27001 A.8.23",
+            "NIST: Protect"
+          ],
+          "recommendation": "Apply web filtering, DNS protection, or secure email gateways to reduce phishing."
+        },
+        {
+          "question_id": "D5",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are third-party vendors (CBS, cloud, IT support) security-assessed?",
+          "references": [
+            "ISO 27001 A.5.19",
+            "NIST: Identify"
+          ],
+          "recommendation": "Assess vendor security and document due diligence for third-party services."
+        },
+        {
+          "question_id": "E1",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do we have a documented incident response plan?",
+          "references": [
+            "ETA \u00a752",
+            "ISO 27001 A.5.25",
+            "NIST: Respond"
+          ],
+          "recommendation": "Create and approve an incident response plan with clear roles and steps."
+        },
+        {
+          "question_id": "E2",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are staff trained on how to report security incidents?",
+          "references": [
+            "ISO 27001 A.6.3",
+            "NIST: Respond"
+          ],
+          "recommendation": "Train staff to report incidents and provide a simple reporting channel."
+        },
+        {
+          "question_id": "E3",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Have we conducted incident simulations or tabletop exercises?",
+          "references": [
+            "ISO 27001 A.5.26",
+            "NIST: Respond"
+          ],
+          "recommendation": "Run tabletop exercises to test the incident response plan."
+        },
+        {
+          "question_id": "E4",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Is there a business continuity and disaster recovery plan?",
+          "references": [
+            "Cooperative Act \u00a774",
+            "ISO 27001 A.5.29",
+            "NIST: Recover"
+          ],
+          "recommendation": "Establish a business continuity and disaster recovery plan with recovery targets."
+        },
+        {
+          "question_id": "E5",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are backups stored offline or off-site?",
+          "references": [
+            "ISO 27001 A.8.13",
+            "NIST: Recover"
+          ],
+          "recommendation": "Maintain offline or off-site backups to reduce ransomware risk."
+        },
+        {
+          "question_id": "F1",
+          "section_id": "F",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do staff receive regular cybersecurity awareness training?",
+          "references": [
+            "ISO 27001 A.6.3",
+            "NIST: Protect"
+          ],
+          "recommendation": "Provide regular cybersecurity awareness training for all staff."
+        },
+        {
+          "question_id": "F2",
+          "section_id": "F",
+          "answer": "yes",
+          "score": 2,
+          "question": "Have internal or external security audits been conducted in the last 12 months?",
+          "references": [
+            "ISO 27001 Clause 9",
+            "NIST: Govern"
+          ],
+          "recommendation": "Schedule internal or external security audits at least annually."
+        },
+        {
+          "question_id": "F3",
+          "section_id": "F",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are audit findings tracked and remediated?",
+          "references": [
+            "ISO 27001 Clause 10",
+            "NIST: Improve"
+          ],
+          "recommendation": "Track audit findings, assign owners, and document remediation progress."
+        },
+        {
+          "question_id": "F4",
+          "section_id": "F",
+          "answer": "yes",
+          "score": 2,
+          "question": "Can we demonstrate evidence (policies, logs, reports) for all above controls?",
+          "references": [
+            "ISO 27001 Annex A",
+            "NIST: Govern"
+          ],
+          "recommendation": "Maintain evidence artifacts such as policies, logs, and reports for controls."
+        }
+      ],
+      "total_questions": 30,
+      "max_score": 60,
+      "summary": {
+        "total_score": 60,
+        "max_score": 60,
+        "score_percent": 100.0,
+        "risk_level": "Strong & Audit-Ready",
+        "section_scores": {
+          "A": {
+            "score": 12,
+            "max_score": 12
+          },
+          "B": {
+            "score": 10,
+            "max_score": 10
+          },
+          "C": {
+            "score": 10,
+            "max_score": 10
+          },
+          "D": {
+            "score": 10,
+            "max_score": 10
+          },
+          "E": {
+            "score": 10,
+            "max_score": 10
+          },
+          "F": {
+            "score": 8,
+            "max_score": 8
+          }
+        },
+        "recommendations": []
+      }
+    },
+    "6b75f867-665e-4269-b851-7a7046fe0101": {
+      "id": "6b75f867-665e-4269-b851-7a7046fe0101",
+      "user_id": 1,
+      "created_at": "2026-02-05T12:42:02.850631",
+      "completed_at": "2026-02-05T12:43:57.689439",
+      "status": "completed",
+      "current_index": 30,
+      "answers": [
+        {
+          "question_id": "A1",
+          "section_id": "A",
+          "answer": "no",
+          "score": 0,
+          "question": "Do we have formally approved written policies covering information security, data protection, and acceptable IT usage?",
+          "references": [
+            "ETA \u00a743",
+            "ISO 27001 A.5",
+            "NIST: Govern"
+          ],
+          "recommendation": "Approve and publish formal policies for information security, data protection, and acceptable IT use."
+        },
+        {
+          "question_id": "A2",
+          "section_id": "A",
+          "answer": "no",
+          "score": 0,
+          "question": "Has the board or management formally assigned responsibility for information security and cyber risk?",
+          "references": [
+            "Cooperative Act \u00a774",
+            "ISO 27001 A.5.3",
+            "NIST: Govern"
+          ],
+          "recommendation": "Assign a named owner for information security and cyber risk with defined responsibilities."
+        },
+        {
+          "question_id": "A3",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are members\u2019 personal, financial, and transaction records classified (e.g., confidential, restricted, public)?",
+          "references": [
+            "ETA \u00a745",
+            "ISO 27001 A.5.12",
+            "NIST: Identify"
+          ],
+          "recommendation": "Create a data classification scheme and apply labels to member records."
+        },
+        {
+          "question_id": "A4",
+          "section_id": "A",
+          "answer": "partial",
+          "score": 1,
+          "question": "Do we maintain documented compliance with Nepal Rastra Bank or regulator guidance where applicable?",
+          "references": [
+            "Cooperative Act 2016",
+            "ISO 27001 A.5",
+            "NIST: Govern"
+          ],
+          "recommendation": "Maintain documented compliance evidence for regulator guidance relevant to the cooperative."
+        },
+        {
+          "question_id": "A5",
+          "section_id": "A",
+          "answer": "no",
+          "score": 0,
+          "question": "Are IT and security policies reviewed at least annually?",
+          "references": [
+            "ISO 27001 Clause 9",
+            "NIST: Govern"
+          ],
+          "recommendation": "Set an annual review cycle for IT and security policies and record approvals."
+        },
+        {
+          "question_id": "A6",
+          "section_id": "A",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do employees sign confidentiality or data protection agreements?",
+          "references": [
+            "ETA \u00a747",
+            "ISO 27001 A.6.6",
+            "NIST: Protect"
+          ],
+          "recommendation": "Ensure all staff sign confidentiality and data protection agreements on onboarding."
+        },
+        {
+          "question_id": "B1",
+          "section_id": "B",
+          "answer": "no",
+          "score": 0,
+          "question": "Do we maintain an inventory of IT assets (computers, servers, software, databases)?",
+          "references": [
+            "ISO 27001 A.5.9",
+            "NIST: Identify"
+          ],
+          "recommendation": "Maintain an up-to-date asset inventory covering hardware, software, and data stores."
+        },
+        {
+          "question_id": "B2",
+          "section_id": "B",
+          "answer": "partial",
+          "score": 1,
+          "question": "Is sensitive cooperative data encrypted when stored and when transmitted?",
+          "references": [
+            "ETA \u00a752",
+            "ISO 27001 A.8.24",
+            "NIST: Protect"
+          ],
+          "recommendation": "Encrypt sensitive data at rest and in transit using approved cryptography."
+        },
+        {
+          "question_id": "B3",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are backups performed regularly and tested for restoration?",
+          "references": [
+            "ISO 27001 A.8.13",
+            "NIST: Protect"
+          ],
+          "recommendation": "Perform scheduled backups and run periodic restoration tests."
+        },
+        {
+          "question_id": "B4",
+          "section_id": "B",
+          "answer": "no",
+          "score": 0,
+          "question": "Is member data retained only as long as legally required?",
+          "references": [
+            "ETA \u00a728",
+            "ISO 27001 A.5.33",
+            "NIST: Govern"
+          ],
+          "recommendation": "Define retention periods and purge data when it is no longer legally required."
+        },
+        {
+          "question_id": "B5",
+          "section_id": "B",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do we restrict copying of sensitive data to USB drives or personal devices?",
+          "references": [
+            "ISO 27001 A.8.12",
+            "NIST: Protect"
+          ],
+          "recommendation": "Restrict or monitor removable media and personal device data transfers."
+        },
+        {
+          "question_id": "C1",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Do all users have unique user IDs (no shared accounts)?",
+          "references": [
+            "ISO 27001 A.8.2",
+            "NIST: Protect"
+          ],
+          "recommendation": "Eliminate shared accounts and enforce unique user IDs."
+        },
+        {
+          "question_id": "C2",
+          "section_id": "C",
+          "answer": "no",
+          "score": 0,
+          "question": "Are strong passwords or multi-factor authentication enforced?",
+          "references": [
+            "ISO 27001 A.8.3",
+            "NIST: Protect"
+          ],
+          "recommendation": "Enforce strong passwords and implement MFA where possible."
+        },
+        {
+          "question_id": "C3",
+          "section_id": "C",
+          "answer": "partial",
+          "score": 1,
+          "question": "Is access immediately revoked when staff leave or change roles?",
+          "references": [
+            "ISO 27001 A.6.3",
+            "NIST: Protect"
+          ],
+          "recommendation": "Implement offboarding procedures to remove or adjust access promptly."
+        },
+        {
+          "question_id": "C4",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are system administrator privileges strictly limited and logged?",
+          "references": [
+            "ISO 27001 A.8.15",
+            "NIST: Detect"
+          ],
+          "recommendation": "Limit admin privileges to essential staff and log all privileged activity."
+        },
+        {
+          "question_id": "C5",
+          "section_id": "C",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are member-facing systems (CBS, mobile apps) protected against unauthorized access?",
+          "references": [
+            "ETA \u00a745",
+            "ISO 27001 A.8",
+            "NIST: Protect"
+          ],
+          "recommendation": "Harden member-facing systems with access controls and security testing."
+        },
+        {
+          "question_id": "D1",
+          "section_id": "D",
+          "answer": "no",
+          "score": 0,
+          "question": "Are antivirus, firewall, and endpoint protections deployed and updated?",
+          "references": [
+            "ISO 27001 A.8.7",
+            "NIST: Protect"
+          ],
+          "recommendation": "Deploy endpoint protection and ensure signatures and engines are up to date."
+        },
+        {
+          "question_id": "D2",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are operating systems and applications patched regularly?",
+          "references": [
+            "ISO 27001 A.8.8",
+            "NIST: Protect"
+          ],
+          "recommendation": "Adopt a patch management schedule for OS and application updates."
+        },
+        {
+          "question_id": "D3",
+          "section_id": "D",
+          "answer": "partial",
+          "score": 1,
+          "question": "Are logs collected and reviewed for suspicious activity?",
+          "references": [
+            "ISO 27001 A.8.15",
+            "NIST: Detect"
+          ],
+          "recommendation": "Centralize logs and review them for suspicious activity on a routine schedule."
+        },
+        {
+          "question_id": "D4",
+          "section_id": "D",
+          "answer": "no",
+          "score": 0,
+          "question": "Is internet access filtered to prevent phishing and malware?",
+          "references": [
+            "ISO 27001 A.8.23",
+            "NIST: Protect"
+          ],
+          "recommendation": "Apply web filtering, DNS protection, or secure email gateways to reduce phishing."
+        },
+        {
+          "question_id": "D5",
+          "section_id": "D",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are third-party vendors (CBS, cloud, IT support) security-assessed?",
+          "references": [
+            "ISO 27001 A.5.19",
+            "NIST: Identify"
+          ],
+          "recommendation": "Assess vendor security and document due diligence for third-party services."
+        },
+        {
+          "question_id": "E1",
+          "section_id": "E",
+          "answer": "no",
+          "score": 0,
+          "question": "Do we have a documented incident response plan?",
+          "references": [
+            "ETA \u00a752",
+            "ISO 27001 A.5.25",
+            "NIST: Respond"
+          ],
+          "recommendation": "Create and approve an incident response plan with clear roles and steps."
+        },
+        {
+          "question_id": "E2",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Are staff trained on how to report security incidents?",
+          "references": [
+            "ISO 27001 A.6.3",
+            "NIST: Respond"
+          ],
+          "recommendation": "Train staff to report incidents and provide a simple reporting channel."
+        },
+        {
+          "question_id": "E3",
+          "section_id": "E",
+          "answer": "yes",
+          "score": 2,
+          "question": "Have we conducted incident simulations or tabletop exercises?",
+          "references": [
+            "ISO 27001 A.5.26",
+            "NIST: Respond"
+          ],
+          "recommendation": "Run tabletop exercises to test the incident response plan."
+        },
+        {
+          "question_id": "E4",
+          "section_id": "E",
+          "answer": "no",
+          "score": 0,
+          "question": "Is there a business continuity and disaster recovery plan?",
+          "references": [
+            "Cooperative Act \u00a774",
+            "ISO 27001 A.5.29",
+            "NIST: Recover"
+          ],
+          "recommendation": "Establish a business continuity and disaster recovery plan with recovery targets."
+        },
+        {
+          "question_id": "E5",
+          "section_id": "E",
+          "answer": "partial",
+          "score": 1,
+          "question": "Are backups stored offline or off-site?",
+          "references": [
+            "ISO 27001 A.8.13",
+            "NIST: Recover"
+          ],
+          "recommendation": "Maintain offline or off-site backups to reduce ransomware risk."
+        },
+        {
+          "question_id": "F1",
+          "section_id": "F",
+          "answer": "no",
+          "score": 0,
+          "question": "Do staff receive regular cybersecurity awareness training?",
+          "references": [
+            "ISO 27001 A.6.3",
+            "NIST: Protect"
+          ],
+          "recommendation": "Provide regular cybersecurity awareness training for all staff."
+        },
+        {
+          "question_id": "F2",
+          "section_id": "F",
+          "answer": "yes",
+          "score": 2,
+          "question": "Have internal or external security audits been conducted in the last 12 months?",
+          "references": [
+            "ISO 27001 Clause 9",
+            "NIST: Govern"
+          ],
+          "recommendation": "Schedule internal or external security audits at least annually."
+        },
+        {
+          "question_id": "F3",
+          "section_id": "F",
+          "answer": "no",
+          "score": 0,
+          "question": "Are audit findings tracked and remediated?",
+          "references": [
+            "ISO 27001 Clause 10",
+            "NIST: Improve"
+          ],
+          "recommendation": "Track audit findings, assign owners, and document remediation progress."
+        },
+        {
+          "question_id": "F4",
+          "section_id": "F",
+          "answer": "partial",
+          "score": 1,
+          "question": "Can we demonstrate evidence (policies, logs, reports) for all above controls?",
+          "references": [
+            "ISO 27001 Annex A",
+            "NIST: Govern"
+          ],
+          "recommendation": "Maintain evidence artifacts such as policies, logs, and reports for controls."
+        }
+      ],
+      "total_questions": 30,
+      "max_score": 60,
+      "summary": {
+        "total_score": 30,
+        "max_score": 60,
+        "score_percent": 50.0,
+        "risk_level": "Moderate Risk / Needs Improvement",
+        "section_scores": {
+          "A": {
+            "score": 5,
+            "max_score": 12
+          },
+          "B": {
+            "score": 5,
+            "max_score": 10
+          },
+          "C": {
+            "score": 7,
+            "max_score": 10
+          },
+          "D": {
+            "score": 5,
+            "max_score": 10
+          },
+          "E": {
+            "score": 5,
+            "max_score": 10
+          },
+          "F": {
+            "score": 3,
+            "max_score": 8
+          }
+        },
+        "recommendations": [
+          {
+            "question_id": "A1",
+            "question": "Do we have formally approved written policies covering information security, data protection, and acceptable IT usage?",
+            "answer": "no",
+            "recommendation": "Approve and publish formal policies for information security, data protection, and acceptable IT use.",
+            "references": [
+              "ETA \u00a743",
+              "ISO 27001 A.5",
+              "NIST: Govern"
+            ]
+          },
+          {
+            "question_id": "A2",
+            "question": "Has the board or management formally assigned responsibility for information security and cyber risk?",
+            "answer": "no",
+            "recommendation": "Assign a named owner for information security and cyber risk with defined responsibilities.",
+            "references": [
+              "Cooperative Act \u00a774",
+              "ISO 27001 A.5.3",
+              "NIST: Govern"
+            ]
+          },
+          {
+            "question_id": "A4",
+            "question": "Do we maintain documented compliance with Nepal Rastra Bank or regulator guidance where applicable?",
+            "answer": "partial",
+            "recommendation": "Maintain documented compliance evidence for regulator guidance relevant to the cooperative.",
+            "references": [
+              "Cooperative Act 2016",
+              "ISO 27001 A.5",
+              "NIST: Govern"
+            ]
+          },
+          {
+            "question_id": "A5",
+            "question": "Are IT and security policies reviewed at least annually?",
+            "answer": "no",
+            "recommendation": "Set an annual review cycle for IT and security policies and record approvals.",
+            "references": [
+              "ISO 27001 Clause 9",
+              "NIST: Govern"
+            ]
+          },
+          {
+            "question_id": "B1",
+            "question": "Do we maintain an inventory of IT assets (computers, servers, software, databases)?",
+            "answer": "no",
+            "recommendation": "Maintain an up-to-date asset inventory covering hardware, software, and data stores.",
+            "references": [
+              "ISO 27001 A.5.9",
+              "NIST: Identify"
+            ]
+          },
+          {
+            "question_id": "B2",
+            "question": "Is sensitive cooperative data encrypted when stored and when transmitted?",
+            "answer": "partial",
+            "recommendation": "Encrypt sensitive data at rest and in transit using approved cryptography.",
+            "references": [
+              "ETA \u00a752",
+              "ISO 27001 A.8.24",
+              "NIST: Protect"
+            ]
+          },
+          {
+            "question_id": "B4",
+            "question": "Is member data retained only as long as legally required?",
+            "answer": "no",
+            "recommendation": "Define retention periods and purge data when it is no longer legally required.",
+            "references": [
+              "ETA \u00a728",
+              "ISO 27001 A.5.33",
+              "NIST: Govern"
+            ]
+          },
+          {
+            "question_id": "C2",
+            "question": "Are strong passwords or multi-factor authentication enforced?",
+            "answer": "no",
+            "recommendation": "Enforce strong passwords and implement MFA where possible.",
+            "references": [
+              "ISO 27001 A.8.3",
+              "NIST: Protect"
+            ]
+          },
+          {
+            "question_id": "C3",
+            "question": "Is access immediately revoked when staff leave or change roles?",
+            "answer": "partial",
+            "recommendation": "Implement offboarding procedures to remove or adjust access promptly.",
+            "references": [
+              "ISO 27001 A.6.3",
+              "NIST: Protect"
+            ]
+          },
+          {
+            "question_id": "D1",
+            "question": "Are antivirus, firewall, and endpoint protections deployed and updated?",
+            "answer": "no",
+            "recommendation": "Deploy endpoint protection and ensure signatures and engines are up to date.",
+            "references": [
+              "ISO 27001 A.8.7",
+              "NIST: Protect"
+            ]
+          },
+          {
+            "question_id": "D3",
+            "question": "Are logs collected and reviewed for suspicious activity?",
+            "answer": "partial",
+            "recommendation": "Centralize logs and review them for suspicious activity on a routine schedule.",
+            "references": [
+              "ISO 27001 A.8.15",
+              "NIST: Detect"
+            ]
+          },
+          {
+            "question_id": "D4",
+            "question": "Is internet access filtered to prevent phishing and malware?",
+            "answer": "no",
+            "recommendation": "Apply web filtering, DNS protection, or secure email gateways to reduce phishing.",
+            "references": [
+              "ISO 27001 A.8.23",
+              "NIST: Protect"
+            ]
+          },
+          {
+            "question_id": "E1",
+            "question": "Do we have a documented incident response plan?",
+            "answer": "no",
+            "recommendation": "Create and approve an incident response plan with clear roles and steps.",
+            "references": [
+              "ETA \u00a752",
+              "ISO 27001 A.5.25",
+              "NIST: Respond"
+            ]
+          },
+          {
+            "question_id": "E4",
+            "question": "Is there a business continuity and disaster recovery plan?",
+            "answer": "no",
+            "recommendation": "Establish a business continuity and disaster recovery plan with recovery targets.",
+            "references": [
+              "Cooperative Act \u00a774",
+              "ISO 27001 A.5.29",
+              "NIST: Recover"
+            ]
+          },
+          {
+            "question_id": "E5",
+            "question": "Are backups stored offline or off-site?",
+            "answer": "partial",
+            "recommendation": "Maintain offline or off-site backups to reduce ransomware risk.",
+            "references": [
+              "ISO 27001 A.8.13",
+              "NIST: Recover"
+            ]
+          },
+          {
+            "question_id": "F1",
+            "question": "Do staff receive regular cybersecurity awareness training?",
+            "answer": "no",
+            "recommendation": "Provide regular cybersecurity awareness training for all staff.",
+            "references": [
+              "ISO 27001 A.6.3",
+              "NIST: Protect"
+            ]
+          },
+          {
+            "question_id": "F3",
+            "question": "Are audit findings tracked and remediated?",
+            "answer": "no",
+            "recommendation": "Track audit findings, assign owners, and document remediation progress.",
+            "references": [
+              "ISO 27001 Clause 10",
+              "NIST: Improve"
+            ]
+          },
+          {
+            "question_id": "F4",
+            "question": "Can we demonstrate evidence (policies, logs, reports) for all above controls?",
+            "answer": "partial",
+            "recommendation": "Maintain evidence artifacts such as policies, logs, and reports for controls.",
+            "references": [
+              "ISO 27001 Annex A",
+              "NIST: Govern"
+            ]
+          }
+        ]
+      }
+    },
+    "d1542895-f688-48ec-8e63-38f4f63a7f08": {
+      "id": "d1542895-f688-48ec-8e63-38f4f63a7f08",
+      "user_id": 1,
+      "created_at": "2026-02-05T13:03:49.397634",
+      "completed_at": "2026-02-05T13:11:26.165748",
+      "status": "cancelled",
+      "current_index": 0,
+      "answers": [],
+      "total_questions": 30,
+      "max_score": 60
+    },
+    "06b9d608-5f02-4dd5-b451-ce40f428d9ae": {
+      "id": "06b9d608-5f02-4dd5-b451-ce40f428d9ae",
+      "user_id": 1,
+      "created_at": "2026-02-06T10:28:03.065397",
+      "completed_at": "2026-02-06T10:28:16.131833",
+      "status": "cancelled",
+      "current_index": 0,
+      "answers": [],
+      "total_questions": 30,
+      "max_score": 60
+    },
+    "6a92d382-9951-4f63-a67e-3e40633aa741": {
+      "id": "6a92d382-9951-4f63-a67e-3e40633aa741",
+      "user_id": 1,
+      "created_at": "2026-02-06T10:28:37.557563",
+      "completed_at": "2026-02-06T10:28:39.993565",
+      "status": "cancelled",
+      "current_index": 0,
+      "answers": [],
+      "total_questions": 30,
+      "max_score": 60
+    }
+  }
+}

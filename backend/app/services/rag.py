@@ -1,7 +1,7 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, AsyncGenerator
 from app.core.database import get_collection
 from app.services.embeddings import embedding_service
 from app.services.documents import document_service
@@ -9,8 +9,38 @@ from app.core.config import settings
 import uuid
 import logging
 import requests
+import hashlib
+from functools import lru_cache
+import asyncio
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory cache for query responses (max 100 cached responses)
+_response_cache: Dict[str, Dict] = {}
+_cache_max_size = 100
+
+
+def _generate_cache_key(query: str, history: Optional[List[Dict[str, Any]]] = None) -> str:
+    """Generate cache key from query and history."""
+    history_str = ""
+    if history:
+        history_str = str([f"{m.get('role', '')}:{m.get('content', '')[:50]}" for m in history[-4:]])
+    cache_input = f"{query.lower().strip()}|{history_str}"
+    return hashlib.md5(cache_input.encode()).hexdigest()
+
+
+def _get_cached_response(cache_key: str) -> Optional[Dict]:
+    """Get cached response if available."""
+    return _response_cache.get(cache_key)
+
+
+def _set_cached_response(cache_key: str, response: Dict):
+    """Cache response with size limit."""
+    global _response_cache
+    if len(_response_cache) >= _cache_max_size:
+        # Remove oldest entry (simple FIFO)
+        _response_cache.pop(next(iter(_response_cache)))
+    _response_cache[cache_key] = response
 
 
 class RAGService:
@@ -81,12 +111,15 @@ class RAGService:
                     f"Available models: {', '.join(available_models)}"
                 )
         
-        # Auto-select best model (prefer llama3, then mistral, then llama2, then first available)
-        preferred_order = ['llama3', 'mistral', 'llama2', 'llama3.2', 'phi3']
+        # Auto-select best model (prefer faster models first for better UX)
+        # llama3.2:1b is fastest, phi3:mini is balanced, llama3 is most accurate
+        preferred_order = ['llama3.2:1b', 'phi3:mini', 'phi3', 'llama3.2', 'llama3', 'mistral', 'llama2']
         for preferred in preferred_order:
-            if preferred in available_models:
-                logger.info(f"Auto-selected model: {preferred}")
-                return preferred
+            # Check exact match or partial match (e.g., llama3.2:1b matches llama3.2)
+            for model in available_models:
+                if model == preferred or model.startswith(preferred.split(':')[0]):
+                    logger.info(f"Auto-selected model: {model} (optimized for speed)")
+                    return model
         
         # Use first available model
         selected = available_models[0]
@@ -176,6 +209,13 @@ class RAGService:
     
     def query(self, user_query: str, top_k: Optional[int] = None, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """Query RAG system and generate response."""
+        # Check cache first for repeated queries
+        cache_key = _generate_cache_key(user_query, history)
+        cached = _get_cached_response(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for query: {user_query[:50]}...")
+            return cached
+        
         # Check if collection has documents
         collection_count = self.collection.count()
         
@@ -204,6 +244,7 @@ class RAGService:
         contexts = []
         citations = []
         total_context_length = 0
+        max_similarity = 0.0
         
         if results["documents"] and len(results["documents"][0]) > 0:
             for i, doc in enumerate(results["documents"][0]):
@@ -216,6 +257,7 @@ class RAGService:
                     # Normalize distance to similarity score (0-1)
                     # Cosine distance ranges from 0 to 2, so similarity = 1 - (distance/2)
                     similarity_score = 1 - (distance / 2.0)
+                    max_similarity = max(max_similarity, similarity_score)
                     
                     # Filter by similarity threshold
                     if similarity_score < similarity_threshold:
@@ -249,15 +291,47 @@ class RAGService:
             combined_text = f"{history_text}\n{user_query}".strip()
             # If no relevant context, allow in-domain general response
             if self._is_in_domain(combined_text) or self._is_greeting(user_query):
+                if self._is_legal_penalty_question(combined_text):
+                    result = {
+                        "answer": (
+                            "I could not find legal penalty details in the current documents. "
+                            "Please add the relevant act/regulation PDFs, then ask again."
+                        ),
+                        "citations": [],
+                        "sources_count": 0
+                    }
+                    _set_cached_response(cache_key, result)
+                    return result
                 if self._is_risk_assessment_request(combined_text) and not self._has_risk_details(combined_text):
-                    return self._risk_assessment_prompt(history=history)
-                return self._basic_chat(user_query, history=history)
-            return {
+                    result = self._risk_assessment_prompt(history=history)
+                    _set_cached_response(cache_key, result)
+                    return result
+                result = self._basic_chat(user_query, history=history)
+                _set_cached_response(cache_key, result)
+                return result
+            result = {
                 "answer": settings.RAG_OUT_OF_DOMAIN_MESSAGE,
                 "citations": [],
                 "sources_count": 0
             }
+            _set_cached_response(cache_key, result)
+            return result
         
+        # If legal penalty question but context is weak, avoid unreliable answers
+        if self._is_legal_penalty_question(user_query):
+            legal_min_similarity = 0.4  # Reduced from 0.6 to allow more legal content
+            if max_similarity < legal_min_similarity:
+                result = {
+                    "answer": (
+                        "I could not find high-confidence legal penalty details in the current documents. "
+                        "Please upload the specific act/regulation PDFs and try again."
+                    ),
+                    "citations": [],
+                    "sources_count": 0
+                }
+                _set_cached_response(cache_key, result)
+                return result
+
         # Create prompt with context - improved for accuracy
         # Build context with source information
         context_parts = []
@@ -267,28 +341,30 @@ class RAGService:
         context_text = "\n\n".join(context_parts)
         
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert AI assistant specializing in cybersecurity compliance, insider risk management, cooperative regulation in Nepal, governance/audit, data privacy, and network security.
-You analyze regulations and cybersecurity frameworks to provide accurate, explainable guidance.
+            ("system", """You are an expert AI assistant for cybersecurity compliance, cooperative regulation in Nepal, and legal frameworks (ETA, Cooperative Act, ISO 27001, NIST).
 
-CRITICAL INSTRUCTIONS:
-1. Use document context when it is relevant.
-2. You may use general domain knowledge to complete or clarify the answer.
-3. Do NOT fabricate document-specific facts. Only state document-backed facts that are present in the context.
-4. Do not mention internal steps or whether information comes from documents in the response body.
-5. Be precise, factual, and professional."""),
-            ("human", """Conversation so far:
-{history}
+RESPONSE STYLE:
+- Be direct, specific, and authoritative
+- Use structured formatting (bullet points, sections) for clarity
+- Cite specific laws, sections, penalties, and amounts when available
+- Provide actionable, concrete information
 
-Context Documents:
+CRITICAL RULES:
+1. LEGAL QUESTIONS: Extract and cite exact sections, penalties, fines, imprisonment terms from documents
+2. TECHNICAL QUESTIONS: Provide specific controls, frameworks, and implementation steps
+3. If documents contain specific details (amounts, timeframes, sections), ALWAYS include them
+4. If no specific details exist, state clearly what is NOT in the documents
+5. Never give generic answers when specific details are available in context
+6. Structure complex answers with clear headings and bullet points"""),
+            ("human", """Context Documents:
 {context}
 
 User Question: {question}
 
-Instructions:
-- Provide a clear, direct answer.
-- Include document-backed details only when they are relevant.
-- If the user asks for a risk assessment, ask the minimum necessary follow-up questions.
-- Do not mention internal steps or data sources in the response body.""")
+Conversation History:
+{history}
+
+Provide a specific, well-structured answer. If the context contains laws, penalties, or specific details, include them. Format your response clearly.""")
         ])
         
         # Generate response using Ollama
@@ -314,11 +390,136 @@ Instructions:
             logger.error(f"Error generating response from Ollama: {e}")
             answer = f"I apologize, but I encountered an error: {str(e)}\n\nPlease check:\n1. Ollama is running: 'ollama serve'\n2. You have a model: 'ollama list'\n3. If not, download one: 'ollama pull llama3'"
         
-        return {
+        result = {
             "answer": answer,
             "citations": citations,
             "sources_count": len(citations)
         }
+        
+        # Cache successful responses
+        _set_cached_response(cache_key, result)
+        return result
+    
+    async def query_stream(self, user_query: str, top_k: Optional[int] = None, history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict, None]:
+        """Stream query response in chunks for better UX."""
+        collection_count = self.collection.count()
+        
+        # Get configuration values
+        default_top_k = getattr(settings, 'RAG_TOP_K', 5)
+        similarity_threshold = getattr(settings, 'RAG_SIMILARITY_THRESHOLD', 0.3)
+        max_context_length = getattr(settings, 'RAG_MAX_CONTEXT_LENGTH', 4000)
+        top_k = top_k or default_top_k
+        
+        # If no documents, fall back to basic non-streaming
+        if collection_count == 0:
+            result = self._basic_chat(user_query, history)
+            yield {"type": "content", "content": result["answer"]}
+            yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
+            return
+        
+        # Retrieve context (same as non-streaming)
+        query_embedding = embedding_service.embed_text(user_query)
+        search_k = min(top_k * 2, collection_count)
+        results = self.collection.query(
+            query_embeddings=[query_embedding],
+            n_results=search_k
+        )
+        
+        contexts = []
+        citations = []
+        total_context_length = 0
+        
+        if results["documents"] and len(results["documents"][0]) > 0:
+            for i, doc in enumerate(results["documents"][0]):
+                metadata = results["metadatas"][0][i]
+                distance = results["distances"][0][i] if "distances" in results else None
+                
+                if distance is not None:
+                    similarity_score = 1 - (distance / 2.0)
+                    if similarity_score < similarity_threshold:
+                        continue
+                else:
+                    similarity_score = None
+                
+                doc_length = len(doc)
+                if total_context_length + doc_length > max_context_length and contexts:
+                    break
+                
+                contexts.append(doc)
+                total_context_length += doc_length
+                citations.append({
+                    "source": metadata.get("source", "Unknown"),
+                    "page": metadata.get("page", "N/A"),
+                    "excerpt": doc[:200] + "..." if len(doc) > 200 else doc,
+                    "relevance_score": round(similarity_score, 3) if similarity_score is not None else None
+                })
+                
+                if len(contexts) >= top_k:
+                    break
+        
+        # If no context, fall back
+        if not contexts:
+            result = self._basic_chat(user_query, history)
+            yield {"type": "content", "content": result["answer"]}
+            yield {"type": "done", "citations": result["citations"], "sources_count": result["sources_count"]}
+            return
+        
+        # Build context and prompt
+        context_parts = []
+        for i, ctx in enumerate(contexts):
+            source_name = citations[i]['source'] if i < len(citations) else "Unknown"
+            context_parts.append(f"[Context {i+1} from {source_name}]:\n{ctx}")
+        context_text = "\n\n".join(context_parts)
+        
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert AI assistant for cybersecurity compliance, cooperative regulation in Nepal, and legal frameworks (ETA, Cooperative Act, ISO 27001, NIST).
+
+RESPONSE STYLE:
+- Be direct, specific, and authoritative
+- Use structured formatting (bullet points, sections) for clarity
+- Cite specific laws, sections, penalties, and amounts when available
+- Provide actionable, concrete information
+
+CRITICAL RULES:
+1. LEGAL QUESTIONS: Extract and cite exact sections, penalties, fines, imprisonment terms from documents
+2. TECHNICAL QUESTIONS: Provide specific controls, frameworks, and implementation steps
+3. If documents contain specific details (amounts, timeframes, sections), ALWAYS include them
+4. If no specific details exist, state clearly what is NOT in the documents
+5. Never give generic answers when specific details are available in context
+6. Structure complex answers with clear headings and bullet points"""),
+            ("human", """Context Documents:
+{context}
+
+User Question: {question}
+
+Conversation History:
+{history}
+
+Provide a specific, well-structured answer. If the context contains laws, penalties, or specific details, include them. Format your response clearly.""")
+        ])
+        
+        try:
+            messages = prompt_template.format_messages(
+                context=context_text,
+                question=user_query,
+                history=self._history_text(history)
+            )
+            
+            llm = self._get_llm()
+            
+            # Stream response chunks
+            for chunk in llm.stream(messages):
+                content = chunk.content if hasattr(chunk, 'content') else str(chunk)
+                if content:
+                    yield {"type": "content", "content": content}
+                    await asyncio.sleep(0)  # Allow other tasks to run
+            
+            # Send citations at the end
+            yield {"type": "done", "citations": citations, "sources_count": len(citations)}
+            
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield {"type": "error", "content": f"Error: {str(e)}"}
     
     def _basic_chat(self, user_query: str, history: Optional[List[Dict[str, Any]]] = None) -> Dict:
         """General chat mode for in-domain queries when no relevant documents are found."""
@@ -327,27 +528,29 @@ Instructions:
             
             # Create a simple prompt for general chat
             prompt_template = ChatPromptTemplate.from_messages([
-                ("system", """You are Sahakari Bot, an expert AI assistant for:
-- Cybersecurity compliance
-- Insider risk management
-- Cooperative regulation in Nepal
-- Governance and audit
-- Data privacy
-- Network security
+                ("system", """You are Sahakari Bot, an expert AI assistant specializing in cybersecurity compliance, cooperative regulation in Nepal, and risk management.
 
-You provide accurate, practical guidance using general knowledge in these areas.
+EXPERTISE AREAS:
+- Nepal legal frameworks (Cooperative Act, ETA, Nepal Rastra Bank regulations)
+- International standards (ISO 27001, NIST CSF)
+- Cybersecurity controls and best practices
+- Insider risk and governance
 
-If the user wants a cooperative cyber risk evaluation, do this:
-1) Ask the minimum necessary questions to assess risk (size, systems, data types, controls, recent incidents, staff training, backups, access control).
-2) Provide a clear risk rating (Low/Medium/High) ONLY after enough info is provided.
-3) Provide prioritized recommendations.
+RESPONSE GUIDELINES:
+1. Be specific and actionable - provide concrete steps, not generic advice
+2. Structure answers clearly with bullet points and sections
+3. For legal questions: Cite specific acts, sections, and penalties when you know them
+4. For technical questions: Provide specific controls, tools, and implementation guidance
+5. For risk questions: Use clear risk levels (Low/Medium/High/Critical) with justification
 
-If the question is outside this scope, respond with:
+If the question is outside cybersecurity/compliance scope, respond with:
 \""" + settings.RAG_OUT_OF_DOMAIN_MESSAGE + "\""""),
-                ("human", """Conversation so far:
+                ("human", """User Question: {question}
+
+Conversation History:
 {history}
 
-User Question: {question}""")
+Provide a clear, specific, well-structured answer.""")
             ])
             
             messages = prompt_template.format_messages(
@@ -410,6 +613,15 @@ User Question: {question}""")
             "cyber risk", "security risk", "risk score"
         ]
         return any(t in query for t in triggers)
+
+    def _is_legal_penalty_question(self, user_query: str) -> bool:
+        """Detect legal penalty or punishment questions to keep responses grounded."""
+        query = user_query.lower()
+        keywords = [
+            "penalty", "fine", "imprisonment", "punishment", "jail",
+            "legal consequence", "sentence", "offense", "offence"
+        ]
+        return any(keyword in query for keyword in keywords)
 
     def _has_risk_details(self, user_query: str) -> bool:
         """Heuristic: check if user provided enough details to rate risk."""

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.api import auth, chat, documents
+from app.api import auth, chat, documents, assessment
 import logging
 
 # Configure logging
@@ -52,6 +52,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["Chat"])
 app.include_router(documents.router, prefix=settings.API_V1_STR, tags=["Documents"])
+app.include_router(assessment.router, prefix=settings.API_V1_STR, tags=["Assessment"])
 
 
 @app.get("/")

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { chatAPI, documentsAPI } from "../services/api";
+import { chatAPI, documentsAPI, assessmentAPI } from "../services/api";
 import logo from "../assets/logo.png";
 
 const Chat = () => {
@@ -13,46 +13,54 @@ const Chat = () => {
   const [docStatus, setDocStatus] = useState(null);
   const [animateTitle, setAnimateTitle] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [assessmentSession, setAssessmentSession] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const statusLabel = docStatus?.has_documents
-    ? `${docStatus.files_count} document${
+  // Memoized computed values to prevent unnecessary re-renders
+  const statusLabel = useMemo(() => {
+    if (docStatus?.has_documents) {
+      return `${docStatus.files_count} document${
         docStatus.files_count !== 1 ? "s" : ""
-      } indexed`
-    : docStatus?.folder_count > 0
-    ? `${docStatus.folder_count} file${
+      } indexed`;
+    }
+    if (docStatus?.folder_count > 0) {
+      return `${docStatus.folder_count} file${
         docStatus.folder_count !== 1 ? "s" : ""
-      } found`
-    : docStatus
-    ? "No documents yet"
-    : "Checking documents...";
-  const statusIcon = docStatus?.has_documents
-    ? "✅"
-    : docStatus?.folder_count > 0
-    ? "⚠️"
-    : "📂";
-  const canReload =
-    docStatus && !docStatus.has_documents && docStatus.folder_count > 0;
-  const userInitial = user?.username?.[0]?.toUpperCase() || "U";
+      } found`;
+    }
+    return docStatus ? "No documents yet" : "Checking documents...";
+  }, [docStatus]);
 
-  useEffect(() => {
-    loadDocumentStatus();
-  }, []);
+  const statusIcon = useMemo(() => {
+    if (docStatus?.has_documents) return "✅";
+    if (docStatus?.folder_count > 0) return "⚠️";
+    return "📂";
+  }, [docStatus]);
+
+  const canReload = useMemo(
+    () => docStatus && !docStatus.has_documents && docStatus.folder_count > 0,
+    [docStatus]
+  );
+
+  const userInitial = useMemo(
+    () => user?.username?.[0]?.toUpperCase() || "U",
+    [user]
+  );
 
   useEffect(() => {
     const timeout = setTimeout(() => setAnimateTitle(false), 2600);
     return () => clearTimeout(timeout);
   }, []);
 
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const loadDocumentStatus = async () => {
+  const loadDocumentStatus = useCallback(async () => {
     try {
       const statusResponse = await documentsAPI.status();
       console.log("📊 Document Status:", statusResponse.data);
@@ -66,7 +74,11 @@ const Chat = () => {
         files_count: 0,
       });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadDocumentStatus();
+  }, [loadDocumentStatus]);
 
   const handleReloadDocuments = async () => {
     try {
@@ -100,6 +112,92 @@ const Chat = () => {
     navigate("/login");
   };
 
+  const isAssessmentTrigger = (text) => {
+    const keyword = text.toLowerCase();
+    const normalized = keyword.replace(/[^a-z0-9\s]/g, " ");
+    const triggers = [
+      "assessment",
+      "assesment",
+      "assess",
+      "risk assessment",
+      "risk evaluation",
+      "risk eval"
+    ];
+    return triggers.some((trigger) => normalized.includes(trigger));
+  };
+
+  const isAssessmentCancel = (text) => {
+    const normalized = text.toLowerCase().trim();
+    
+    // Valid assessment answers - don't cancel for these
+    const validAnswers = ["yes", "no", "partial", "y", "n"];
+    if (validAnswers.includes(normalized)) {
+      return false;
+    }
+    
+    // Check for cancellation phrases
+    const cancelPhrases = [
+      "cancel",
+      "stop",
+      "exit",
+      "quit",
+      "no thanks",
+      "i don't want",
+      "i dont want",
+      "not interested",
+      "skip",
+      "back",
+      "leave",
+      "abort",
+      "stop assessment",
+      "cancel assessment"
+    ];
+    return cancelPhrases.some((phrase) => normalized.includes(phrase));
+  };
+
+  const buildAssessmentQuestion = (payload) => {
+    const refs = payload.references?.length
+      ? `📚 ${payload.references.join(", ")}`
+      : "";
+    return (
+      `📂 ${payload.section_title}\n` +
+      `❓ Question ${payload.question_index} of ${payload.total_questions}:\n\n` +
+      `${payload.question}\n\n` +
+      (refs ? `${refs}\n\n` : "") +
+      `💬 Answer: Yes | No | Partial\n` +
+      `Type 'cancel' to exit.`
+    );
+  };
+
+  const buildAssessmentSummary = (payload) => {
+    const summaryLines = [
+      "✅ Assessment completed.",
+      `Total Score: ${payload.total_score} / ${payload.max_score}`,
+      `Score Percent: ${payload.score_percent}%`,
+      `Risk Level: ${payload.risk_level}`
+    ];
+    if (payload.section_scores) {
+      summaryLines.push("Section Scores:");
+      Object.entries(payload.section_scores).forEach(([section, scores]) => {
+        summaryLines.push(
+          `- Section ${section}: ${scores.score} / ${scores.max_score}`
+        );
+      });
+    }
+    if (payload.recommendations?.length) {
+      summaryLines.push("Key Recommendations:");
+      payload.recommendations.slice(0, 6).forEach((rec) => {
+        summaryLines.push(
+          `- ${rec.question_id}: ${rec.recommendation}`
+        );
+      });
+      if (payload.recommendations.length > 6) {
+        summaryLines.push("...more recommendations available in the report.");
+      }
+    }
+    return summaryLines.join("\n");
+  };
+
   const sendMessage = async (message) => {
     if (!message.trim() || loading) return;
 
@@ -115,6 +213,83 @@ const Chat = () => {
     setLoading(true);
 
     try {
+      if (assessmentSession?.active) {
+        if (isAssessmentCancel(message)) {
+          await assessmentAPI.cancel({ assessment_id: assessmentSession.id });
+          setAssessmentSession(null);
+          const cancelMsg = {
+            id: Date.now() + 1,
+            type: "bot",
+            content: "✅ Assessment cancelled.\n\nYou can start a new assessment anytime by typing 'assessment' or 'risk assessment'."
+          };
+          setMessages((prev) => [...prev, cancelMsg]);
+          return;
+        }
+
+        try {
+          const response = await assessmentAPI.answer({
+            assessment_id: assessmentSession.id,
+            answer: message.trim(),
+          });
+
+          if (response.data.completed) {
+            const reportUrl = assessmentAPI.report(response.data.assessment_id);
+            const botMessage = {
+              id: Date.now() + 1,
+              type: "bot",
+              content: buildAssessmentSummary(response.data),
+              link: reportUrl,
+              linkLabel: "Download PDF report"
+            };
+            setMessages((prev) => [...prev, botMessage]);
+            setAssessmentSession(null);
+          } else {
+            const botMessage = {
+              id: Date.now() + 1,
+              type: "bot",
+              content: buildAssessmentQuestion(response.data),
+            };
+            setMessages((prev) => [...prev, botMessage]);
+          }
+          return;
+        } catch (error) {
+          // Handle invalid answer
+          const errorMsg = {
+            id: Date.now() + 1,
+            type: "error",
+            content: error.response?.data?.detail || "Invalid answer. Please answer with Yes, No, or Partial.\n\nType 'cancel' or 'exit' to stop the assessment."
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+          return;
+        }
+      }
+
+      if (isAssessmentTrigger(message)) {
+        const response = await assessmentAPI.start();
+        const introMessage = {
+          id: Date.now() + 1,
+          type: "bot",
+          content:
+            "🔒 Starting your cybersecurity compliance assessment.\n\n" +
+            "📋 Please answer each question with:\n" +
+            "• Yes (implemented)\n" +
+            "• No (not implemented)\n" +
+            "• Partial (partially implemented)\n\n" +
+            "💡 Type 'cancel' or 'exit' anytime to stop."
+        };
+        const questionMessage = {
+          id: Date.now() + 2,
+          type: "bot",
+          content: buildAssessmentQuestion(response.data),
+        };
+        setAssessmentSession({
+          id: response.data.assessment_id,
+          active: true
+        });
+        setMessages((prev) => [...prev, introMessage, questionMessage]);
+        return;
+      }
+
       const history = messages
         .filter((msg) => msg.type === "user" || msg.type === "bot")
         .slice(-8)
@@ -123,20 +298,64 @@ const Chat = () => {
           content: msg.content,
         }));
 
-      const response = await chatAPI.query({ query: message.trim(), history });
+      // Use streaming for better UX
+      const botMessageId = Date.now() + 1;
+      let accumulatedContent = "";
+      let citations = [];
+      let sourcesCount = 0;
+
+      // Add initial empty bot message
       const botMessage = {
-        id: Date.now() + 1,
+        id: botMessageId,
         type: "bot",
-        content: response.data.answer,
-        citations: response.data.citations,
+        content: "",
+        citations: [],
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMessage]);
+
+      await chatAPI.queryStream(
+        { query: message.trim(), history },
+        // onChunk
+        (chunk) => {
+          accumulatedContent += chunk;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === botMessageId
+                ? { ...msg, content: accumulatedContent }
+                : msg
+            )
+          );
+        },
+        // onDone
+        (citationsData, count) => {
+          citations = citationsData;
+          sourcesCount = count;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === botMessageId
+                ? { ...msg, citations, sources_count: sourcesCount }
+                : msg
+            )
+          );
+        },
+        // onError
+        (errorMsg) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === botMessageId
+                ? { ...msg, type: "error", content: errorMsg }
+                : msg
+            )
+          );
+        }
+      );
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
         type: "error",
         content:
+          error.response?.data?.detail ||
           error.response?.data?.detail ||
           "Failed to get response. Please try again.",
         timestamp: new Date(),
@@ -315,6 +534,16 @@ const Chat = () => {
                         </div>
                         <div className="text-sm sm:text-base text-slate-100 leading-relaxed flex-1">
                           <p className="whitespace-pre-wrap">{msg.content}</p>
+                          {msg.link && (
+                            <a
+                              href={msg.link}
+                              className="inline-flex items-center gap-2 mt-3 text-sm text-blue-400 hover:text-blue-300"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {msg.linkLabel || "Download report"}
+                            </a>
+                          )}
                         </div>
                       </div>
                     )}
