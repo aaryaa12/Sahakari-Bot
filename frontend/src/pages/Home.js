@@ -214,9 +214,9 @@ const Home = ({ initialAuthMode = null }) => {
                   </p>
                   <div className="grid gap-3">
                     {[
-                      "Incident response and breach reporting",
-                      "Vendor risk and due diligence checks",
-                      "Data retention and access controls",
+                      "What does section 18 of ETA state?",
+                      "How can I prevent insider threats?",
+                      "I want to start my security assessment",
                     ].map((item) => (
                       <div
                         key={item}

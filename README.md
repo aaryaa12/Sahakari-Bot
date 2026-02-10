@@ -5,7 +5,7 @@
 A thesis project implementing an intelligent chatbot that provides legal interpretation, cybersecurity compliance assessment, and insider risk evaluation for cooperatives in Nepal, aligned with international frameworks (ISO 27001, NIST CSF) and local regulations (Cooperative Act 2074, Electronic Transaction Act 2063).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![React](https://img.shields.io/badge/react-18.0+-61DAFB.svg)](https://reactjs.org/)
 
 ---
@@ -40,6 +40,7 @@ Sahakari Bot addresses the critical gap in cybersecurity compliance guidance for
 ### Problem Statement
 
 Nepal's cooperative sector faces significant challenges:
+
 - Lack of accessible cybersecurity compliance guidance
 - Complex legal requirements (Cooperative Act, ETA)
 - No integration between local laws and international frameworks
@@ -49,6 +50,7 @@ Nepal's cooperative sector faces significant challenges:
 ### Solution
 
 An AI-powered chatbot that:
+
 1. Interprets legal documents in plain language
 2. Assesses cybersecurity compliance across 6 domains
 3. Provides framework-aligned security recommendations
@@ -105,6 +107,7 @@ An AI-powered chatbot that:
 ### 6. **International Framework Integration**
 
 **ISO 27001:2013 (12 Annex A Controls):**
+
 - A.5 (Information Security Policies)
 - A.6 (Organization)
 - A.7 (Human Resource Security)
@@ -116,6 +119,7 @@ An AI-powered chatbot that:
 - A.16 (Incident Management)
 
 **NIST Cybersecurity Framework (13 Controls):**
+
 - Govern, Identify, Protect, Detect, Respond, Recover functions
 - PR.AC (Access Control), PR.AT (Training), PR.DS (Data Security)
 - DE.CM (Monitoring), RS.RP (Response Planning), etc.
@@ -225,45 +229,45 @@ User Query (Security)
 
 ### Backend
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **API Framework** | FastAPI | High-performance Python API |
-| **LLM** | Ollama (llama3.2:3b) | Local language model for RAG |
-| **Vector Database** | ChromaDB | Embedding storage & semantic search |
-| **LLM Orchestration** | LangChain | RAG pipeline management |
-| **PDF Processing** | PDFPlumber | Legal document parsing |
-| **PDF Generation** | ReportLab | Assessment report generation |
-| **Authentication** | JWT (python-jose) | User authentication |
-| **Password Hashing** | Passlib (bcrypt) | Secure password storage |
+| Component             | Technology                          | Purpose                             |
+| --------------------- | ----------------------------------- | ----------------------------------- |
+| **API Framework**     | FastAPI                             | High-performance Python API         |
+| **LLM**               | Ollama (local, auto-detected model) | Local language model for RAG        |
+| **Vector Database**   | ChromaDB                            | Embedding storage & semantic search |
+| **LLM Orchestration** | LangChain                           | RAG pipeline management             |
+| **PDF Processing**    | PDFPlumber                          | Legal document parsing              |
+| **PDF Generation**    | ReportLab                           | Assessment report generation        |
+| **Authentication**    | JWT (python-jose)                   | User authentication                 |
+| **Password Hashing**  | Passlib (bcrypt)                    | Secure password storage             |
 
 ### Frontend
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **UI Framework** | React 18 | Modern, component-based UI |
-| **Routing** | React Router | Client-side navigation |
-| **HTTP Client** | Axios | API communication |
-| **State Management** | Context API | Global state (auth) |
-| **Styling** | Tailwind CSS | Utility-first CSS |
+| Component            | Technology   | Purpose                    |
+| -------------------- | ------------ | -------------------------- |
+| **UI Framework**     | React 18     | Modern, component-based UI |
+| **Routing**          | React Router | Client-side navigation     |
+| **HTTP Client**      | Axios        | API communication          |
+| **State Management** | Context API  | Global state (auth)        |
+| **Styling**          | Tailwind CSS | Utility-first CSS          |
 
 ### AI/ML Components
 
-| Component | Purpose |
-|-----------|---------|
-| **RAG (Retrieval Augmented Generation)** | Combines retrieval + generation for accurate answers |
-| **Embeddings** | nomic-embed-text for semantic search |
-| **Intent Classification** | Keyword + LLM-based intent routing |
-| **Legal Classification** | AI-driven metadata enrichment (legal type/scope) |
-| **Query Understanding** | Automatic extraction of section numbers, act names, topics |
+| Component                                | Purpose                                                    |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| **RAG (Retrieval Augmented Generation)** | Combines retrieval + generation for accurate answers       |
+| **Embeddings**                           | Sentence Transformers (`all-MiniLM-L6-v2`)                 |
+| **Intent Classification**                | Keyword + LLM-based intent routing                         |
+| **Legal Classification**                 | AI-driven metadata enrichment (legal type/scope)           |
+| **Query Understanding**                  | Automatic extraction of section numbers, act names, topics |
 
 ### Data Processing
 
-| Component | Purpose |
-|-----------|---------|
-| **Legal Parser** | Extracts sections, chapters, titles from PDF |
-| **Section Splitter** | Chunks legal text while preserving context |
-| **Legal Classifier** | Classifies sections by type (obligation, penalty) and scope (governance, finance) |
-| **Numeric Validator** | Validates section/chapter number formats |
+| Component             | Purpose                                                                           |
+| --------------------- | --------------------------------------------------------------------------------- |
+| **Legal Parser**      | Extracts sections, chapters, titles from PDF                                      |
+| **Section Splitter**  | Chunks legal text while preserving context                                        |
+| **Legal Classifier**  | Classifies sections by type (obligation, penalty) and scope (governance, finance) |
+| **Numeric Validator** | Validates section/chapter number formats                                          |
 
 ---
 
@@ -274,6 +278,7 @@ User Query (Security)
 **User Query:** "What is Section 27 of Cooperative Act?"
 
 **System Process:**
+
 1. **Intent Detection**: Recognizes LEGAL mode (section reference detected)
 2. **Query Understanding**: Extracts section_number=27, detected_act="Cooperative Act"
 3. **Metadata Filtering**: Filters ChromaDB for:
@@ -289,6 +294,7 @@ User Query (Security)
    - Evidence with Act citation
 
 **Output Format:**
+
 ```
 **Cooperative Act 2074 — Section 27**
 
@@ -320,6 +326,7 @@ Source: Cooperative Act 2074, Section 27, Page X
 **User Query:** "How can I protect my cooperative from insider risks?"
 
 **System Process:**
+
 1. **Intent Detection**: Recognizes SECURITY mode ("insider" keyword)
 2. **Topic Detection**: Identifies topics = ["insider_risk", "insider_threat"]
 3. **Control Selection**: Maps to framework controls:
@@ -333,6 +340,7 @@ Source: Cooperative Act 2074, Section 27, Page X
 5. **Response**: Returns practical guidance with framework IDs
 
 **Output Format:**
+
 ```
 **1. Access Control** (NIST PR.AC-4, ISO 27001 A.9.2.3)
 - Implement role-based access control (RBAC)
@@ -355,6 +363,7 @@ Source: Cooperative Act 2074, Section 27, Page X
 **User Action:** Types "start assessment" in chat
 
 **System Process:**
+
 1. Creates new assessment session
 2. Presents questions one-by-one (30 total)
 3. User answers: Yes (2 points) / Partial (1 point) / No (0 points)
@@ -373,6 +382,7 @@ Source: Cooperative Act 2074, Section 27, Page X
    - Framework references (ISO/NIST control IDs)
 
 **Assessment Domains:**
+
 ```
 Section A: Governance, Policy & Legal Compliance (6 questions)
 Section B: Asset & Data Management (5 questions)
@@ -387,6 +397,7 @@ Section F: Awareness, Audit & Improvement (4 questions)
 **Critical Design:** LEGAL and SECURITY modes are completely isolated.
 
 **LEGAL Mode:**
+
 - Uses RAG pipeline with ChromaDB
 - Cites Act sections
 - Uses 5-heading legal format
@@ -394,6 +405,7 @@ Section F: Awareness, Audit & Improvement (4 questions)
 - Strict grounding (no hallucination)
 
 **SECURITY Mode:**
+
 - Uses framework control knowledge base (Python dict)
 - Cites ISO/NIST controls
 - Provides practical technical steps
@@ -401,6 +413,7 @@ Section F: Awareness, Audit & Improvement (4 questions)
 - Separate prompt template
 
 **No Cross-Contamination:**
+
 - Legal responses never mention NIST/ISO controls
 - Security responses never cite Cooperative Act/ETA sections
 
@@ -410,8 +423,8 @@ Section F: Awareness, Audit & Improvement (4 questions)
 
 ### Prerequisites
 
-- **Python 3.9+** (for backend)
-- **Node.js 16+** (for frontend)
+- **Python 3.10 or 3.11** (for backend)
+- **Node.js 18+** (for frontend)
 - **Ollama** (for local LLM)
 - **Git** (for cloning)
 
@@ -425,13 +438,14 @@ cd sahakari-bot
 ### Step 2: Install Ollama & Models
 
 **Windows:**
-1. Download Ollama from https://ollama.ai/download
+
+1. Download Ollama from https://ollama.com/download
 2. Install and run Ollama
 3. Pull required models:
 
 ```bash
-ollama pull llama3.2:3b
-ollama pull nomic-embed-text
+ollama pull llama3
+# Optional smaller model:
 ollama pull llama3.2:1b
 ```
 
@@ -441,26 +455,28 @@ ollama pull llama3.2:1b
 cd backend
 
 # Create virtual environment
-python -m venv venv
+python -m venv .venv
 
 # Activate virtual environment
 # Windows:
-venv\Scripts\activate
+.venv\Scripts\activate
 # Mac/Linux:
-source venv/bin/activate
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### Step 4: Ingest Legal Documents
+### Step 4: Add / Ingest Documents
 
 ```bash
-# This creates the vector database and indexes the legal documents
+# Place your documents in data/documents and start the backend
+# Optional: force re-ingest existing documents
 python reingest_legal_docs.py
 ```
 
 **Expected output:**
+
 - Cooperative Act 2074: ~144 chunks ingested
 - Electronic Transaction Act 2063: ~78 chunks ingested
 - Total: ~222 chunks in ChromaDB
@@ -477,6 +493,7 @@ npm install
 ### Step 6: Run the Application
 
 **Terminal 1 - Backend:**
+
 ```bash
 cd backend
 uvicorn app.main:app --reload
@@ -484,6 +501,7 @@ uvicorn app.main:app --reload
 ```
 
 **Terminal 2 - Frontend:**
+
 ```bash
 cd frontend
 npm start
@@ -493,11 +511,13 @@ npm start
 ### Step 7: Access the Application
 
 Open your browser and navigate to:
+
 ```
 http://localhost:3000
 ```
 
 **Create an account or login:**
+
 - Click "Get started" or "Sign in"
 - Create account with email/username/password
 - Start chatting!
@@ -509,6 +529,7 @@ http://localhost:3000
 ### Legal Queries
 
 **Ask about specific sections:**
+
 ```
 What is Section 27 of Cooperative Act?
 What is Chapter 3 of ETA?
@@ -516,6 +537,7 @@ Explain Section 4 of ETA
 ```
 
 **Ask concept questions:**
+
 ```
 What are byelaws and internal procedures?
 What happens if unauthorized loans are given?
@@ -526,6 +548,7 @@ What is an electronic signature?
 ### Security Queries
 
 **Insider threat protection:**
+
 ```
 How can I protect my cooperative from insider risks?
 How to prevent insider threats?
@@ -533,6 +556,7 @@ What controls prevent insider fraud?
 ```
 
 **General security:**
+
 ```
 What firewall should I use for my cooperative?
 How to implement multi-factor authentication?
@@ -543,6 +567,7 @@ How to protect against phishing attacks?
 ### Compliance Assessment
 
 **Start assessment:**
+
 ```
 start assessment
 risk assessment
@@ -550,11 +575,13 @@ begin assessment
 ```
 
 **Answer questions:**
+
 - Type `yes`, `no`, or `partial` for each question
 - Or: `y`, `n`, `informal`
 - 30 questions total
 
 **Cancel assessment:**
+
 ```
 cancel
 stop
@@ -562,6 +589,7 @@ exit assessment
 ```
 
 **Download Report:**
+
 - After completion, click "Download PDF report" button
 - PDF includes section scores, recommendations, risk analysis
 
@@ -585,6 +613,7 @@ python quick_test_rag.py
 ```
 
 This tests all modes with sample questions and verifies:
+
 - Intent routing
 - 5-heading format (legal)
 - Framework references (security)
@@ -597,6 +626,7 @@ python test_behavioral_contract.py
 ```
 
 Verifies:
+
 - Legal grounding (no hallucination)
 - 5-heading format consistency
 - No internal prompt leakage
@@ -608,6 +638,7 @@ python eval_legal_qa.py
 ```
 
 Tests:
+
 - Section retrieval accuracy
 - Act isolation (no cross-law mixing)
 - Citation correctness
@@ -620,6 +651,7 @@ python test_security_mode.py
 ```
 
 Verifies:
+
 - Intent routing (SECURITY vs LEGAL)
 - Framework control references
 - No legal citations in security mode
@@ -632,6 +664,7 @@ python test_structured_rag.py
 ```
 
 Tests:
+
 - Query understanding
 - Legal classification
 - Metadata filtering
@@ -641,28 +674,15 @@ Tests:
 
 ## 📚 Documentation
 
-### Thesis Documentation
+### Setup & Usage
 
-- **THESIS_COMPLIANCE_ANALYSIS.md** - Detailed analysis of thesis requirements fulfillment
-- **THESIS_READINESS_CHECKLIST.md** - Thesis submission checklist
-
-### Architecture & Implementation
-
-- **STRUCTURED_LEGAL_RAG_IMPLEMENTATION.md** - Legal RAG architecture
-- **SECURITY_FRAMEWORKS_INTEGRATION.md** - Framework integration details
-- **SECURITY_ADVISORY_MODE.md** - Security mode implementation
-- **SECURITY_VS_LEGAL_MODE_COMPARISON.md** - Mode comparison
-
-### Features
-
-- **ENHANCED_PDF_REPORT.md** - PDF report enhancements
-- **ASSESSMENT_PDF_DOWNLOAD_FIX.md** - PDF download implementation
-- **FRAMEWORK_CONTROLS_QUICK_REFERENCE.md** - Framework control reference
-
-### Testing & Setup
-
-- **TEST_QUESTIONS.md** - 100 test questions across all modes
-- **WINDOWS_SETUP.md** - Windows-specific setup guide
+- **WINDOWS_SETUP.md** - Windows setup guide (recommended)
+- **QUICK_START.md** - Minimal setup to run the app
+- **FREE_SETUP.md** - Free, local AI setup (Ollama + sentence-transformers)
+- **DOCUMENT_SETUP.md** - Document ingestion guide
+- **backend/OLLAMA_SETUP.md** - Ollama troubleshooting
+- **backend/README.md** - Backend notes
+- **frontend/README.md** - Frontend notes
 
 ---
 
@@ -683,28 +703,32 @@ Tests:
 ### Research Questions Answered
 
 **RQ1:** How can AI improve cybersecurity compliance for cooperatives?
+
 - ✅ RAG-based chatbot provides instant legal interpretation + compliance assessment
 
 **RQ2:** How to integrate international frameworks with local regulations?
+
 - ✅ Dual-mode architecture with explicit framework mapping
 
 **RQ3:** How to evaluate insider risk in cooperatives?
+
 - ✅ Framework-based controls + assessment questions + security advisory module
 
 **RQ4:** How to make compliance guidance accessible?
+
 - ✅ Conversational chatbot with plain language explanations
 
 ### Component Fulfillment: 99/100
 
-| Component | Score |
-|-----------|-------|
-| AI-Driven | 10/10 ✅ |
-| Cybersecurity Compliance | 10/10 ✅ |
-| Insider Risk Evaluation | 9/10 ✅ |
-| Chatbot | 10/10 ✅ |
+| Component                           | Score    |
+| ----------------------------------- | -------- |
+| AI-Driven                           | 10/10 ✅ |
+| Cybersecurity Compliance            | 10/10 ✅ |
+| Insider Risk Evaluation             | 9/10 ✅  |
+| Chatbot                             | 10/10 ✅ |
 | For Cooperatives (Kathmandu Valley) | 10/10 ✅ |
-| International Frameworks | 10/10 ✅ |
-| Local Regulations | 10/10 ✅ |
+| International Frameworks            | 10/10 ✅ |
+| Local Regulations                   | 10/10 ✅ |
 
 ---
 
@@ -717,7 +741,7 @@ Tests:
 - **Framework Controls**: 25+ (12 ISO 27001 + 13 NIST CSF)
 - **Risk Scenarios**: 30 detailed technical recommendations
 - **Test Questions**: 100+ across all modes
-- **Documentation Files**: 18 comprehensive guides
+- **Documentation Files**: Core setup + usage guides
 - **Test Coverage**: 4 test suites (behavioral, legal QA, security, structured RAG)
 
 ---
@@ -764,6 +788,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 👥 Authors
 
 **Thesis Project** by [Your Name]
+
 - Institution: [Your University]
 - Department: Computer Science / Information Technology
 - Year: 2026
@@ -784,6 +809,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Contact
 
 For questions, suggestions, or collaboration:
+
 - Email: [your.email@example.com]
 - GitHub: [your-github-username]
 - LinkedIn: [your-linkedin-profile]

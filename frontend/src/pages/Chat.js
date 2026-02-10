@@ -400,10 +400,6 @@ const Chat = () => {
                 <h1 className="text-sm font-semibold text-slate-100 tracking-tight">
                   Sahakari Bot
                 </h1>
-                <p className="text-[11px] text-slate-400 flex items-center gap-2">
-                  <span>{statusIcon}</span>
-                  {statusLabel}
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -480,9 +476,9 @@ const Chat = () => {
               )}
               <div className="grid gap-3 sm:grid-cols-3 max-w-3xl mx-auto text-left">
                 {[
-                  "Which policies define incident response timelines?",
-                  "Summarize our vendor risk assessment requirements.",
-                  "What controls cover data retention and deletion?",
+                  "What does section 18 of ETA state?",
+                  "How can I prevent insider threats?",
+                  "I want to start my security assessment",
                 ].map((prompt) => (
                   <button
                     key={prompt}

@@ -4,7 +4,7 @@ FastAPI backend for cybersecurity compliance RAG chatbot.
 
 ## Setup
 
-1. Install dependencies:
+1. Install dependencies (Python 3.10 or 3.11 recommended):
 
 ```bash
 pip install -r requirements.txt

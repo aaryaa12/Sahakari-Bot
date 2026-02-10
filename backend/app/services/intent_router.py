@@ -28,7 +28,7 @@ def detect_intent(question: str) -> str:
         "cyber", "threat", "ransomware", "authentication",
         "mfa", "2fa", "vpn", "patch", "update", "insider risk",
         "insider threat", "data protection", "access control",
-        "prevent", "safeguard", "defend", "monitor"
+        "prevent", "safeguard", "defend", "monitor", "insider risk"
     ]
     
     if any(k in q for k in security_keywords):
